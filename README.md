@@ -1,6 +1,6 @@
 # Backend
 
-Backend do site whitelabel da Eldo Eletrostática (empresa de pintura eletrostática).
+Backend do site institucional da Eldo Eletrostática (empresa de pintura eletrostática).
 
 ## Stack
 
