@@ -71,8 +71,15 @@ Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agen
 
 ## Este repo: Backend
 
-- Cada funcionalidade é um módulo do NestJS com controller (entrada e saída HTTP), service (regra de negócio) e entity (tabela). A regra de negócio mora no service; o controller recebe a requisição, chama o service e devolve a resposta.
-- Arquivos em kebab-case com o sufixo do papel, como o CLI do Nest gera: `service-order.controller.ts`, `service-order.service.ts`, `service-order.entity.ts`.
+- Arquitetura MVC em camadas, com uma pasta por entidade. O controller é o Controller do MVC; o Model se divide em entity (os dados, a tabela) e service (a regra de negócio, a camada a mais); os DTOs definem o formato dos dados que entram e saem, e a View é o Frontend. O controller recebe a requisição, chama o service e devolve a resposta.
+- Crie cada módulo pelo CLI do Nest, na raiz do repo, e mantenha a estrutura que ele gera:
+
+  ```bash
+  npx -p @nestjs/cli@11 nest g resource <nome> --type rest --crud
+  ```
+
+  O `<nome>` vem do `GLOSSARY.md`, em inglês, kebab-case e no plural (`service-orders`): ele vira a pasta e a rota (`/service-orders`), e a entity e os DTOs saem no singular (`ServiceOrder`). O comando baixa o CLI porque o `node_modules` do host fica vazio: as dependências vivem no container.
+- A entity gerada vem vazia. Adicione os decorators do TypeORM e registre a entity no módulo com `TypeOrmModule.forFeature([<Entity>])`; o `autoLoadEntities` do `app.module.ts` só carrega as entities registradas assim.
 - As entities usam propriedades em camelCase, gravadas no banco em snake_case pelo `SnakeNamingStrategy` (pacote `typeorm-naming-strategies`). Se ele ainda não estiver configurado no `TypeOrmModule` de `app.module.ts`, configure antes de criar a primeira entity.
 - Testes: unitários em `*.spec.ts` ao lado do arquivo testado; integração de endpoint em `test/*.e2e-spec.ts`, com supertest. Teste parametrizado usa `it.each` com pelo menos dois parâmetros por caso (exigência da disciplina).
 - Os testes de integração precisam do Postgres do `docker compose` no ar.
