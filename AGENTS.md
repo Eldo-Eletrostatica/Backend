@@ -36,7 +36,7 @@ Ao nomear um conceito do domínio (orçamento, OS, categoria...), use o termo de
 | Onde | Padrão | Exemplo |
 | --- | --- | --- |
 | Variáveis, funções, métodos | camelCase | `estimatedPriceRange`, `findOverdueServiceOrders()` |
-| Classes, tipos, componentes React | PascalCase | `QuoteRequest`, `PortfolioGallery` |
+| Classes, tipos, componentes React | PascalCase | `QuoteItem`, `PortfolioGallery` |
 | Constantes | UPPER_SNAKE_CASE | `MAX_PROJECTS_PER_CATEGORY` |
 | Tabelas e colunas do PostgreSQL | snake_case | `service_orders.created_at` |
 
