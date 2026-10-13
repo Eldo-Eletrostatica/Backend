@@ -1,7 +1,7 @@
 import { DataSource, QueryRunner } from 'typeorm';
 import { createTypeOrmOptions } from '../src/database/typeorm.config';
 
-const insertRow: Record<string, (value: string) => string> = {
+const INSERT_SQL_BY_TABLE: Record<string, (value: string) => string> = {
   employees: (email) =>
     `INSERT INTO employees (name, email, password_hash) VALUES ('Ana', '${email}', 'hash')`,
   customers: (document) =>
@@ -78,10 +78,10 @@ describe('Schema do banco (e2e)', () => {
     ['employees', 'ana@eldo.com'],
     ['customers', '12345678000199'],
   ])('%s rejeita %s repetido entre registros ativos', async (table, value) => {
-    await queryRunner.query(insertRow[table](value));
-    await expect(queryRunner.query(insertRow[table](value))).rejects.toThrow(
-      /UQ_/,
-    );
+    await queryRunner.query(INSERT_SQL_BY_TABLE[table](value));
+    await expect(
+      queryRunner.query(INSERT_SQL_BY_TABLE[table](value)),
+    ).rejects.toThrow(/UQ_/);
   });
 
   it.each([
@@ -90,10 +90,10 @@ describe('Schema do banco (e2e)', () => {
   ])(
     '%s aceita reaproveitar %s depois da exclusão lógica',
     async (table, value) => {
-      await queryRunner.query(insertRow[table](value));
+      await queryRunner.query(INSERT_SQL_BY_TABLE[table](value));
       await queryRunner.query(`UPDATE ${table} SET deleted_at = now()`);
       await expect(
-        queryRunner.query(insertRow[table](value)),
+        queryRunner.query(INSERT_SQL_BY_TABLE[table](value)),
       ).resolves.toBeDefined();
     },
   );
