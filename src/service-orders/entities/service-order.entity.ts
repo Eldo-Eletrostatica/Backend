@@ -18,7 +18,7 @@ import { Quote } from '../../quotes/entities/quote.entity';
 
 export enum ServiceOrderStatus {
   Queued = 'queued',
-  InProduction = 'in_production',
+  InProduction = 'inProduction',
   Finishing = 'finishing',
   Completed = 'completed',
 }
