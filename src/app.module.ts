@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CommissionRulesModule } from './commission-rules/commission-rules.module';
 import { ContactRequestsModule } from './contact-requests/contact-requests.module';
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
@@ -10,6 +11,7 @@ import { EmployeesModule } from './employees/employees.module';
 import { PaintTypesModule } from './paint-types/paint-types.module';
 import { PartMaterialsModule } from './part-materials/part-materials.module';
 import { QuotesModule } from './quotes/quotes.module';
+import { ServiceOrdersModule } from './service-orders/service-orders.module';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { QuotesModule } from './quotes/quotes.module';
     PaintTypesModule,
     PartMaterialsModule,
     QuotesModule,
+    CommissionRulesModule,
+    ServiceOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
