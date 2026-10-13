@@ -3,7 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ContactRequestsModule } from './contact-requests/contact-requests.module';
+import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
+import { EmployeesModule } from './employees/employees.module';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { createTypeOrmOptions } from './database/typeorm.config';
         migrationsRun: true,
       }),
     }),
+    EmployeesModule,
+    CustomersModule,
+    ContactRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
