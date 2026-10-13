@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommissionRulesModule } from './commission-rules/commission-rules.module';
+import { CompanyEventsModule } from './company-events/company-events.module';
 import { ContactRequestsModule } from './contact-requests/contact-requests.module';
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
@@ -12,6 +13,8 @@ import { InventoryCategoriesModule } from './inventory-categories/inventory-cate
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { PaintTypesModule } from './paint-types/paint-types.module';
 import { PartMaterialsModule } from './part-materials/part-materials.module';
+import { PortfolioCategoriesModule } from './portfolio-categories/portfolio-categories.module';
+import { PortfolioProjectsModule } from './portfolio-projects/portfolio-projects.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
@@ -48,6 +51,9 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     SuppliersModule,
     InventoryItemsModule,
     StockMovementsModule,
+    PortfolioCategoriesModule,
+    PortfolioProjectsModule,
+    CompanyEventsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
