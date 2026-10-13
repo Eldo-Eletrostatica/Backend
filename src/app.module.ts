@@ -17,6 +17,7 @@ import { PortfolioCategoriesModule } from './portfolio-categories/portfolio-cate
 import { PortfolioProjectsModule } from './portfolio-projects/portfolio-projects.module';
 import { QuotesModule } from './quotes/quotes.module';
 import { ServiceOrdersModule } from './service-orders/service-orders.module';
+import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 
@@ -54,6 +55,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     PortfolioCategoriesModule,
     PortfolioProjectsModule,
     CompanyEventsModule,
+    SiteSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
