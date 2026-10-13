@@ -43,15 +43,13 @@ Variáveis disponíveis (`.env.example`):
 docker compose up --build
 ```
 
-Isso sobe três serviços:
+Isso sobe dois serviços:
 - `postgres`: PostgreSQL 16, na porta `5432`
 - `backend`: a API NestJS, com hot-reload via volume montado, na porta `3001` (mapeada para a `3000` interna do container). Ao subir, ela aplica as migrations pendentes, então o banco já fica com todas as tabelas.
-- `pgadmin`: pgAdmin 4, na porta `5050`, para inspecionar o banco
 
 Acesse:
 - API: [http://localhost:3001](http://localhost:3001) (retorna `Hello World!`)
 - Documentação Swagger: [http://localhost:3001/api](http://localhost:3001/api)
-- pgAdmin: [http://localhost:5050](http://localhost:5050) (veja [Visualizando o banco no pgAdmin](#visualizando-o-banco-no-pgadmin))
 
 ### Depois de mudar dependências (`package.json`)
 
@@ -102,22 +100,17 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-O `-v` apaga os volumes do Postgres e do pgAdmin. Na subida seguinte, as migrations recriam todas as tabelas.
+O `-v` apaga o volume do Postgres. Na subida seguinte, as migrations recriam todas as tabelas.
 
 ### Visualizando o banco no pgAdmin
 
-1. Acesse [http://localhost:5050](http://localhost:5050) e entre com `admin@eldo.com.br` / `admin`.
-2. O servidor **Eldo (Docker)** já aparece cadastrado em *Servers*. Ao abrir, informe a senha do Postgres: `postgres`.
-3. As tabelas ficam em *Databases › postgres › Schemas › public › Tables*.
-4. Para gerar o diagrama físico (ERD), clique com o botão direito em *Databases › postgres* e escolha **ERD For Database**. O diagrama pode ser exportado como imagem pelo botão de download.
+O pgAdmin não faz parte da stack: use o que está instalado na sua máquina. Com o `docker compose` de pé, o Postgres fica exposto em `localhost:5432`.
 
-O servidor é cadastrado a partir de `docker/pgadmin/servers.json` apenas na primeira vez que o pgAdmin sobe. Se o volume do pgAdmin já existia antes, cadastre o servidor à mão (host `postgres`, porta `5432`, usuário e senha `postgres`) ou apague só esse volume e suba de novo:
-
-```bash
-docker compose rm -sf pgadmin
-docker volume rm backend_pgadmin_data
-docker compose up -d pgadmin
-```
+1. No pgAdmin, clique com o botão direito em *Servers* › *Register › Server*.
+2. Na aba *General*, dê um nome (por exemplo, `Eldo (Docker)`).
+3. Na aba *Connection*, preencha host `localhost`, porta `5432`, banco `postgres`, usuário `postgres` e senha `postgres`.
+4. As tabelas ficam em *Databases › postgres › Schemas › public › Tables*.
+5. Para gerar o diagrama físico (ERD), clique com o botão direito em *Databases › postgres* e escolha **ERD For Database**. O diagrama pode ser exportado como imagem pelo botão de download.
 
 ## Rodando localmente sem Docker (alternativa)
 
