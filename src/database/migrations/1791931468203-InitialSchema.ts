@@ -41,6 +41,9 @@ export class InitialSchema1791931468203 implements MigrationInterface {
       `CREATE INDEX "IDX_stock_movements_moved_at" ON "stock_movements" ("moved_at") `,
     );
     await queryRunner.query(
+      `CREATE TABLE "site_settings" ("site_setting_id" uuid NOT NULL DEFAULT gen_random_uuid(), "visual_published" jsonb, "visual_draft" jsonb, "is_estimator_enabled" boolean NOT NULL DEFAULT true, "negotiation_margin" numeric(5,2) NOT NULL DEFAULT '0', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "CHK_site_settings_negotiation_margin" CHECK ("negotiation_margin" >= 0 AND "negotiation_margin" <= 100), CONSTRAINT "PK_site_settings" PRIMARY KEY ("site_setting_id"))`,
+    );
+    await queryRunner.query(
       `CREATE TABLE "commission_rules" ("commission_rule_id" uuid NOT NULL DEFAULT gen_random_uuid(), "employee_id" uuid, "min_total" numeric(12,2), "max_total" numeric(12,2), "type" character varying(20) NOT NULL, "value" numeric(12,2) NOT NULL, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "CHK_commission_rules_value" CHECK ("value" > 0 AND ("type" <> 'percentage' OR "value" <= 100)), CONSTRAINT "CHK_commission_rules_total_range" CHECK ("min_total" IS NULL OR "max_total" IS NULL OR "min_total" <= "max_total"), CONSTRAINT "CHK_commission_rules_type" CHECK ("type" IN ('percentage', 'fixed')), CONSTRAINT "PK_commission_rules" PRIMARY KEY ("commission_rule_id"))`,
     );
     await queryRunner.query(
@@ -77,10 +80,7 @@ export class InitialSchema1791931468203 implements MigrationInterface {
       `CREATE UNIQUE INDEX "UQ_service_orders_tracking_code" ON "service_orders" ("tracking_code") `,
     );
     await queryRunner.query(
-      `CREATE TABLE "site_settings" ("site_setting_id" uuid NOT NULL DEFAULT gen_random_uuid(), "visual_published" jsonb, "visual_draft" jsonb, "is_estimator_enabled" boolean NOT NULL DEFAULT true, "negotiation_margin" numeric(5,2) NOT NULL DEFAULT '0', "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "CHK_site_settings_negotiation_margin" CHECK ("negotiation_margin" >= 0 AND "negotiation_margin" <= 100), CONSTRAINT "PK_site_settings" PRIMARY KEY ("site_setting_id"))`,
-    );
-    await queryRunner.query(
-      `CREATE TABLE "paint_types" ("paint_type_id" uuid NOT NULL DEFAULT gen_random_uuid(), "name" character varying(100) NOT NULL, "price_per_m2" numeric(10,2) NOT NULL, "is_active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "PK_paint_types" PRIMARY KEY ("paint_type_id"))`,
+      `CREATE TABLE "paint_types" ("paint_type_id" uuid NOT NULL DEFAULT gen_random_uuid(), "name" character varying(100) NOT NULL, "price_per_m2" numeric(10,2) NOT NULL, "is_active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "CHK_paint_types_price_per_m2" CHECK ("price_per_m2" > 0), CONSTRAINT "PK_paint_types" PRIMARY KEY ("paint_type_id"))`,
     );
     await queryRunner.query(
       `CREATE TABLE "part_materials" ("part_material_id" uuid NOT NULL DEFAULT gen_random_uuid(), "name" character varying(100) NOT NULL, "price_factor" numeric(6,3) NOT NULL, "is_active" boolean NOT NULL DEFAULT true, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, CONSTRAINT "CHK_part_materials_price_factor" CHECK ("price_factor" > 0), CONSTRAINT "PK_part_materials" PRIMARY KEY ("part_material_id"))`,
@@ -234,7 +234,6 @@ export class InitialSchema1791931468203 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "quote_items"`);
     await queryRunner.query(`DROP TABLE "part_materials"`);
     await queryRunner.query(`DROP TABLE "paint_types"`);
-    await queryRunner.query(`DROP TABLE "site_settings"`);
     await queryRunner.query(
       `DROP INDEX "public"."UQ_service_orders_tracking_code"`,
     );
@@ -257,6 +256,7 @@ export class InitialSchema1791931468203 implements MigrationInterface {
       `DROP INDEX "public"."IDX_commission_rules_employee_id"`,
     );
     await queryRunner.query(`DROP TABLE "commission_rules"`);
+    await queryRunner.query(`DROP TABLE "site_settings"`);
     await queryRunner.query(
       `DROP INDEX "public"."IDX_stock_movements_moved_at"`,
     );

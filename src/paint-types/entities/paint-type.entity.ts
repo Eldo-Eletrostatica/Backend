@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
@@ -9,6 +10,7 @@ import {
 import { numericTransformer } from '../../database/numeric.transformer';
 
 @Entity('paint_types')
+@Check('CHK_paint_types_price_per_m2', '"price_per_m2" > 0')
 export class PaintType {
   @PrimaryGeneratedColumn('uuid', {
     primaryKeyConstraintName: 'PK_paint_types',
