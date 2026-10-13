@@ -7,6 +7,9 @@ import { ContactRequestsModule } from './contact-requests/contact-requests.modul
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
 import { EmployeesModule } from './employees/employees.module';
+import { PaintTypesModule } from './paint-types/paint-types.module';
+import { PartMaterialsModule } from './part-materials/part-materials.module';
+import { QuotesModule } from './quotes/quotes.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { EmployeesModule } from './employees/employees.module';
     EmployeesModule,
     CustomersModule,
     ContactRequestsModule,
+    PaintTypesModule,
+    PartMaterialsModule,
+    QuotesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
