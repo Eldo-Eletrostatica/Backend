@@ -36,29 +36,35 @@ describe('Schema do banco (e2e)', () => {
   });
 
   it.each([
-    ['employees'],
-    ['customers'],
-    ['contact_requests'],
-    ['paint_types'],
-    ['part_materials'],
-    ['quotes'],
-    ['quote_items'],
-    ['commission_rules'],
-    ['service_orders'],
-    ['inventory_categories'],
-    ['suppliers'],
-    ['inventory_items'],
-    ['stock_movements'],
-    ['portfolio_categories'],
-    ['portfolio_projects'],
-    ['company_events'],
-    ['site_settings'],
-  ])('cria a tabela %s', async (table) => {
+    ['employees', 'employee_id'],
+    ['customers', 'customer_id'],
+    ['contact_requests', 'contact_request_id'],
+    ['paint_types', 'paint_type_id'],
+    ['part_materials', 'part_material_id'],
+    ['quotes', 'quote_id'],
+    ['quote_items', 'quote_item_id'],
+    ['commission_rules', 'commission_rule_id'],
+    ['service_orders', 'service_order_id'],
+    ['inventory_categories', 'inventory_category_id'],
+    ['suppliers', 'supplier_id'],
+    ['inventory_items', 'inventory_item_id'],
+    ['stock_movements', 'stock_movement_id'],
+    ['portfolio_categories', 'portfolio_category_id'],
+    ['portfolio_projects', 'portfolio_project_id'],
+    ['company_events', 'company_event_id'],
+    ['site_settings', 'site_setting_id'],
+  ])('cria a tabela %s com a PK %s', async (table, primaryKey) => {
     const rows = (await queryRunner.query(
-      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1`,
+      `SELECT kcu.column_name
+         FROM information_schema.table_constraints tc
+         JOIN information_schema.key_column_usage kcu
+           ON kcu.constraint_name = tc.constraint_name
+        WHERE tc.table_schema = 'public'
+          AND tc.table_name = $1
+          AND tc.constraint_type = 'PRIMARY KEY'`,
       [table],
-    )) as unknown[];
-    expect(rows).toHaveLength(1);
+    )) as { column_name: string }[];
+    expect(rows).toEqual([{ column_name: primaryKey }]);
   });
 
   it('cria o registro único de configurações do site', async () => {

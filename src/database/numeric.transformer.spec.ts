@@ -8,8 +8,11 @@ describe('numericTransformer', () => {
     expect(numericTransformer.from(raw)).toBe(expected);
   });
 
-  it.each([[null], [undefined]])('mantém %s vindo do banco', (raw) => {
-    expect(numericTransformer.from(raw)).toBeNull();
+  it.each([
+    [null, null],
+    [undefined, null],
+  ])('converte %s vindo do banco para %s', (raw, expected) => {
+    expect(numericTransformer.from(raw)).toBe(expected);
   });
 
   it.each([
