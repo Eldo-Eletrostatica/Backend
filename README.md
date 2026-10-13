@@ -44,9 +44,9 @@ docker compose up --build
 ```
 
 Isso sobe três serviços:
-- `postgres` — PostgreSQL 16, na porta `5432`
-- `backend` — a API NestJS, com hot-reload via volume montado, na porta `3001` (mapeada para a `3000` interna do container). Ao subir, ela aplica as migrations pendentes, então o banco já fica com todas as tabelas.
-- `pgadmin` — pgAdmin 4, na porta `5050`, para inspecionar o banco
+- `postgres`: PostgreSQL 16, na porta `5432`
+- `backend`: a API NestJS, com hot-reload via volume montado, na porta `3001` (mapeada para a `3000` interna do container). Ao subir, ela aplica as migrations pendentes, então o banco já fica com todas as tabelas.
+- `pgadmin`: pgAdmin 4, na porta `5050`, para inspecionar o banco
 
 Acesse:
 - API: [http://localhost:3001](http://localhost:3001) (retorna `Hello World!`)
