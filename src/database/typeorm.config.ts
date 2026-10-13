@@ -15,6 +15,8 @@ export function createTypeOrmOptions(env: DatabaseEnv): DataSourceOptions {
     password: env.DB_PASSWORD ?? 'postgres',
     database: env.DB_NAME ?? 'postgres',
     namingStrategy: new SnakeNamingStrategy(),
+    // gen_random_uuid() is built into PostgreSQL 13+, so no extension is needed.
+    uuidExtension: 'pgcrypto',
     entities: [join(__dirname, '..', '**', '*.entity.{ts,js}')],
     migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
     synchronize: false,
