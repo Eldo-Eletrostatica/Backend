@@ -10,8 +10,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { stockQuantityColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { numericTransformer } from '../../database/numeric.transformer';
 import { InventoryCategory } from '../../inventory-categories/entities/inventory-category.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 
@@ -60,23 +60,11 @@ export class InventoryItem {
   unit: InventoryUnit;
 
   // Kept in sync with stock_movements: update both in the same transaction.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 3,
-    default: 0,
-    transformer: numericTransformer,
-  })
+  @Column(stockQuantityColumn({ default: 0 }))
   balance: number;
 
   // The stock alert fires when the balance is at or below this value.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 3,
-    default: 0,
-    transformer: numericTransformer,
-  })
+  @Column(stockQuantityColumn({ default: 0 }))
   minimumStock: number;
 
   @CreateDateColumn({ type: 'timestamptz' })

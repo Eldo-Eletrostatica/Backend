@@ -9,8 +9,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { stockQuantityColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { numericTransformer } from '../../database/numeric.transformer';
 import { Employee } from '../../employees/entities/employee.entity';
 import { InventoryItem } from '../../inventory-items/entities/inventory-item.entity';
 
@@ -54,12 +54,7 @@ export class StockMovement {
   type: StockMovementType;
 
   // Always positive; the type says whether it adds to or subtracts from the balance.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 3,
-    transformer: numericTransformer,
-  })
+  @Column(stockQuantityColumn())
   quantity: number;
 
   @Column({ type: 'text' })

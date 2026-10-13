@@ -9,6 +9,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { priceFactorColumn, pricePerM2Column } from '../../database/columns';
 import { numericTransformer } from '../../database/numeric.transformer';
 import { PaintType } from '../../paint-types/entities/paint-type.entity';
 import { PartMaterial } from '../../part-materials/entities/part-material.entity';
@@ -70,20 +71,10 @@ export class QuoteItem {
   quantity: number;
 
   // Snapshots of the price rules at quote time (ADR 0003).
-  @Column({
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    transformer: numericTransformer,
-  })
+  @Column(pricePerM2Column())
   pricePerM2: number;
 
-  @Column({
-    type: 'numeric',
-    precision: 6,
-    scale: 3,
-    transformer: numericTransformer,
-  })
+  @Column(priceFactorColumn())
   priceFactor: number;
 
   @CreateDateColumn({ type: 'timestamptz' })

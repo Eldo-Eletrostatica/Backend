@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { MAX_PERCENTAGE } from '../../database/columns';
 import { numericTransformer } from '../../database/numeric.transformer';
 
 // Single-row table: the service reads and updates the only record, created by
@@ -13,7 +14,7 @@ import { numericTransformer } from '../../database/numeric.transformer';
 @Entity('site_settings')
 @Check(
   'CHK_site_settings_negotiation_margin',
-  '"negotiation_margin" >= 0 AND "negotiation_margin" <= 100',
+  `"negotiation_margin" >= 0 AND "negotiation_margin" <= ${MAX_PERCENTAGE}`,
 )
 export class SiteSetting {
   @PrimaryGeneratedColumn('uuid', {

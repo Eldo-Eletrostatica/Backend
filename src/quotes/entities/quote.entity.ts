@@ -10,8 +10,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Customer } from '../../customers/entities/customer.entity';
+import { moneyColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { numericTransformer } from '../../database/numeric.transformer';
 
 export enum QuoteSource {
   Pdf = 'pdf',
@@ -58,32 +58,14 @@ export class Quote {
   status: QuoteStatus;
 
   // Estimated range, filled in only by the estimator.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    nullable: true,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn({ nullable: true }))
   minPrice: number | null;
 
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    nullable: true,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn({ nullable: true }))
   maxPrice: number | null;
 
   // Price the company sends back to the customer.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    nullable: true,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn({ nullable: true }))
   finalPrice: number | null;
 
   @Column({ type: 'timestamptz', nullable: true })

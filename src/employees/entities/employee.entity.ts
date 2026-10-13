@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { EMAIL_MAX_LENGTH } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
 
 export enum EmployeeRole {
@@ -27,7 +28,7 @@ export class Employee {
 
   // Partial index: the e-mail of a removed employee can be reused.
   @Index('UQ_employees_email', { unique: true, where: '"deleted_at" IS NULL' })
-  @Column({ type: 'varchar', length: 254 })
+  @Column({ type: 'varchar', length: EMAIL_MAX_LENGTH })
   email: string;
 
   @Column({ type: 'varchar', length: 255 })

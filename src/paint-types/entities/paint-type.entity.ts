@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { numericTransformer } from '../../database/numeric.transformer';
+import { pricePerM2Column } from '../../database/columns';
 
 @Entity('paint_types')
 @Check('CHK_paint_types_price_per_m2', '"price_per_m2" > 0')
@@ -20,12 +20,7 @@ export class PaintType {
   @Column({ type: 'varchar', length: 100 })
   name: string;
 
-  @Column({
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    transformer: numericTransformer,
-  })
+  @Column(pricePerM2Column())
   pricePerM2: number;
 
   @Column({ type: 'boolean', default: true })

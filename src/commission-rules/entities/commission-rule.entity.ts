@@ -10,8 +10,8 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { MAX_PERCENTAGE, moneyColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { numericTransformer } from '../../database/numeric.transformer';
 import { Employee } from '../../employees/entities/employee.entity';
 
 export enum CommissionRuleType {
@@ -29,7 +29,7 @@ export enum CommissionRuleType {
 )
 @Check(
   'CHK_commission_rules_value',
-  `"value" > 0 AND ("type" <> '${CommissionRuleType.Percentage}' OR "value" <= 100)`,
+  `"value" > 0 AND ("type" <> '${CommissionRuleType.Percentage}' OR "value" <= ${MAX_PERCENTAGE})`,
 )
 export class CommissionRule {
   @PrimaryGeneratedColumn('uuid', {
@@ -48,34 +48,17 @@ export class CommissionRule {
   })
   employee: Employee | null;
 
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    nullable: true,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn({ nullable: true }))
   minTotal: number | null;
 
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    nullable: true,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn({ nullable: true }))
   maxTotal: number | null;
 
   @Column({ type: 'varchar', length: 20 })
   type: CommissionRuleType;
 
   // Percentage (0–100) or fixed amount in BRL, depending on the type.
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn())
   value: number;
 
   @CreateDateColumn({ type: 'timestamptz' })

@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { numericTransformer } from '../../database/numeric.transformer';
+import { priceFactorColumn } from '../../database/columns';
 
 @Entity('part_materials')
 @Check('CHK_part_materials_price_factor', '"price_factor" > 0')
@@ -21,12 +21,7 @@ export class PartMaterial {
   name: string;
 
   // Multiplies the price per m² of the paint type in the quote estimate.
-  @Column({
-    type: 'numeric',
-    precision: 6,
-    scale: 3,
-    transformer: numericTransformer,
-  })
+  @Column(priceFactorColumn())
   priceFactor: number;
 
   @Column({ type: 'boolean', default: true })

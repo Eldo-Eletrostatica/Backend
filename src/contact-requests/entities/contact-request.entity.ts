@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Customer } from '../../customers/entities/customer.entity';
+import { EMAIL_MAX_LENGTH } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
 
 export enum ContactRequestStatus {
@@ -40,7 +41,7 @@ export class ContactRequest {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
-  @Column({ type: 'varchar', length: 254 })
+  @Column({ type: 'varchar', length: EMAIL_MAX_LENGTH })
   email: string;
 
   @Column({ type: 'varchar', length: 20 })

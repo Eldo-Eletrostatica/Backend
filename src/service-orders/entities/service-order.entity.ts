@@ -11,10 +11,12 @@ import {
 } from 'typeorm';
 import { CommissionRule } from '../../commission-rules/entities/commission-rule.entity';
 import { Customer } from '../../customers/entities/customer.entity';
+import { moneyColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { numericTransformer } from '../../database/numeric.transformer';
 import { Employee } from '../../employees/entities/employee.entity';
 import { Quote } from '../../quotes/entities/quote.entity';
+
+export const TRACKING_CODE_LENGTH = 8;
 
 export enum ServiceOrderStatus {
   Queued = 'queued',
@@ -80,21 +82,11 @@ export class ServiceOrder {
   })
   commissionRule: CommissionRule | null;
 
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn())
   total: number;
 
   // Snapshot of the commission at sale time (ADR 0003).
-  @Column({
-    type: 'numeric',
-    precision: 12,
-    scale: 2,
-    transformer: numericTransformer,
-  })
+  @Column(moneyColumn())
   commission: number;
 
   @Column({ type: 'timestamptz' })
@@ -102,7 +94,7 @@ export class ServiceOrder {
 
   // Random code the customer uses to track the order (ADR 0001).
   @Index('UQ_service_orders_tracking_code', { unique: true })
-  @Column({ type: 'char', length: 8 })
+  @Column({ type: 'char', length: TRACKING_CODE_LENGTH })
   trackingCode: string;
 
   @Column({ type: 'text' })
