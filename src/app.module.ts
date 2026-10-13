@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -26,16 +26,11 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // ConfigModule copies the .env values into process.env, so the factory
+    // reads the same variables as the TypeORM CLI.
     TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        ...createTypeOrmOptions({
-          DB_HOST: configService.get<string>('DB_HOST'),
-          DB_PORT: configService.get<string>('DB_PORT'),
-          DB_USERNAME: configService.get<string>('DB_USERNAME'),
-          DB_PASSWORD: configService.get<string>('DB_PASSWORD'),
-          DB_NAME: configService.get<string>('DB_NAME'),
-        }),
+      useFactory: () => ({
+        ...createTypeOrmOptions(process.env),
         autoLoadEntities: true,
         migrationsRun: true,
       }),
