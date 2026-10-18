@@ -21,6 +21,10 @@ export enum CustomerType {
 
 @Entity('customers')
 @Check('CHK_customers_type', enumCheck('type', CustomerType))
+@Check(
+  'CHK_customers_document',
+  `"type" <> '${CustomerType.Business}' OR "document" IS NOT NULL`,
+)
 export class Customer {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_customers' })
   customerId: string;
@@ -31,13 +35,13 @@ export class Customer {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
-  // CPF or CNPJ.
+  // CPF or CNPJ; an individual who only sent the contact form may have none.
   @Index('UQ_customers_document', {
     unique: true,
     where: '"deleted_at" IS NULL',
   })
-  @Column({ type: 'varchar', length: DOCUMENT_MAX_LENGTH })
-  document: string;
+  @Column({ type: 'varchar', length: DOCUMENT_MAX_LENGTH, nullable: true })
+  document: string | null;
 
   @Column({ type: 'varchar', length: EMAIL_MAX_LENGTH })
   email: string;
