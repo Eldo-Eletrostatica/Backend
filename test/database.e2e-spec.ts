@@ -38,20 +38,12 @@ describe('Schema do banco (e2e)', () => {
   it.each([
     ['employees', 'employee_id'],
     ['customers', 'customer_id'],
-    ['contact_requests', 'contact_request_id'],
-    ['paint_types', 'paint_type_id'],
-    ['part_materials', 'part_material_id'],
-    ['quotes', 'quote_id'],
-    ['quote_items', 'quote_item_id'],
-    ['commission_rules', 'commission_rule_id'],
-    ['service_orders', 'service_order_id'],
-    ['inventory_categories', 'inventory_category_id'],
-    ['suppliers', 'supplier_id'],
+    ['catalog_items', 'catalog_item_id'],
+    ['orders', 'order_id'],
+    ['order_items', 'order_item_id'],
     ['inventory_items', 'inventory_item_id'],
     ['stock_movements', 'stock_movement_id'],
-    ['portfolio_categories', 'portfolio_category_id'],
-    ['portfolio_projects', 'portfolio_project_id'],
-    ['company_events', 'company_event_id'],
+    ['showcase_items', 'showcase_item_id'],
     ['site_settings', 'site_setting_id'],
   ])('cria a tabela %s com a PK %s', async (table, primaryKey) => {
     const rows = (await queryRunner.query(
@@ -109,5 +101,45 @@ describe('Schema do banco (e2e)', () => {
     ],
   ])('%s rejeita valor fora do enum', async (_table, sql) => {
     await expect(queryRunner.query(sql)).rejects.toThrow(/CHK_/);
+  });
+
+  it.each([
+    [
+      'cliente PJ sem CNPJ',
+      `INSERT INTO customers (type, name, email, phone) VALUES ('business', 'ACME', 'contato@acme.com', '61999999999')`,
+    ],
+    [
+      'tipo de pintura com fator de material',
+      `INSERT INTO catalog_items (type, name, price_per_m2, price_factor) VALUES ('paintType', 'Epóxi', 50, 1.2)`,
+    ],
+    [
+      'material sem fator',
+      `INSERT INTO catalog_items (type, name) VALUES ('partMaterial', 'Aço')`,
+    ],
+    [
+      'comissão sem tipo',
+      `INSERT INTO employees (name, email, password_hash, commission_value) VALUES ('Ana', 'b@eldo.com', 'hash', 5)`,
+    ],
+    [
+      'pedido em produção sem dados da venda',
+      `INSERT INTO orders (customer_id, source, status) SELECT customer_id, 'internal', 'queued' FROM customers`,
+    ],
+  ])('rejeita %s', async (_case, sql) => {
+    await queryRunner.query(INSERT_SQL_BY_TABLE.customers('12345678000199'));
+    await expect(queryRunner.query(sql)).rejects.toThrow(/CHK_/);
+  });
+
+  it.each([
+    [
+      'cliente PF sem CPF vindo do contato',
+      `INSERT INTO customers (type, name, email, phone) VALUES ('individual', 'Bia', 'bia@email.com', '61988888888')`,
+    ],
+    [
+      'pedido de contato sem dados da venda',
+      `INSERT INTO orders (customer_id, source, customer_message) SELECT customer_id, 'contact', 'Quero pintar um portão' FROM customers`,
+    ],
+  ])('aceita %s', async (_case, sql) => {
+    await queryRunner.query(INSERT_SQL_BY_TABLE.customers('12345678000199'));
+    await expect(queryRunner.query(sql)).resolves.toBeDefined();
   });
 });
