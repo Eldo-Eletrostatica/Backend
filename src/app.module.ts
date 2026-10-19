@@ -1,27 +1,40 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CatalogItemsModule } from './catalog-items/catalog-items.module';
+import { CustomersModule } from './customers/customers.module';
+import { createTypeOrmOptions } from './database/typeorm.config';
+import { EmployeesModule } from './employees/employees.module';
+import { InventoryItemsModule } from './inventory-items/inventory-items.module';
+import { OrdersModule } from './orders/orders.module';
+import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
+import { SiteSettingsModule } from './site-settings/site-settings.module';
+import { StockMovementsModule } from './stock-movements/stock-movements.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    // ConfigModule copies the .env values into process.env, so the factory
+    // reads the same variables as the TypeORM CLI.
     TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get<string>('DB_HOST', 'localhost'),
-        port: Number(configService.get('DB_PORT', 5432)),
-        username: configService.get<string>('DB_USERNAME', 'postgres'),
-        password: configService.get<string>('DB_PASSWORD', 'postgres'),
-        database: configService.get<string>('DB_NAME', 'postgres'),
+      useFactory: () => ({
+        ...createTypeOrmOptions(process.env),
         autoLoadEntities: true,
-        synchronize: true,
+        migrationsRun: true,
       }),
     }),
+    EmployeesModule,
+    CustomersModule,
+    CatalogItemsModule,
+    OrdersModule,
+    InventoryItemsModule,
+    StockMovementsModule,
+    ShowcaseItemsModule,
+    SiteSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
