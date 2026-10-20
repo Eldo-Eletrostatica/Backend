@@ -27,17 +27,24 @@ export function moneyColumn(options: NumericColumnOptions = {}): ColumnOptions {
   return numericColumn(12, 2, options);
 }
 
-// Shared by the price rule and its snapshot in the quote item, so the copy
+// Shared by the catalog item and its snapshot in the order item, so the copy
 // always fits the original value.
-export function pricePerM2Column(): ColumnOptions {
-  return numericColumn(10, 2, {});
+export function pricePerM2Column(
+  options: NumericColumnOptions = {},
+): ColumnOptions {
+  return numericColumn(10, 2, options);
 }
 
-export function priceFactorColumn(): ColumnOptions {
-  return numericColumn(6, 3, {});
+export function priceFactorColumn(
+  options: NumericColumnOptions = {},
+): ColumnOptions {
+  return numericColumn(6, 3, options);
 }
 
 // Stock amounts in kg, liters or units, with up to three decimals.
+// numeric(12, 3) leaves nine digits before the decimal point.
+export const MAX_STOCK_QUANTITY = 999_999_999.999;
+
 export function stockQuantityColumn(
   options: NumericColumnOptions = {},
 ): ColumnOptions {

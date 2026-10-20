@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ServiceOrder } from './entities/service-order.entity';
+import { CustomersModule } from '../customers/customers.module';
+import { OrdersModule } from '../orders/orders.module';
 import { ServiceOrdersController } from './service-orders.controller';
 import { ServiceOrdersService } from './service-orders.service';
-import { Customer } from '../customers/entities/customer.entity';
-import { Employee } from '../employees/entities/employee.entity';
 
+// A service order is a stage of the order (ADR 0005). The sale launch creates
+// it; this module lists, moves and publishes that stage.
 @Module({
-  imports: [TypeOrmModule.forFeature([ServiceOrder, Customer, Employee])],
+  imports: [OrdersModule, CustomersModule],
   controllers: [ServiceOrdersController],
   providers: [ServiceOrdersService],
-  exports: [TypeOrmModule],
 })
 export class ServiceOrdersModule {}

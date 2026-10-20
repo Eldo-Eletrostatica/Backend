@@ -1,25 +1,20 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CommissionRulesModule } from './commission-rules/commission-rules.module';
-import { CompanyEventsModule } from './company-events/company-events.module';
-import { ContactRequestsModule } from './contact-requests/contact-requests.module';
+import { CatalogItemsModule } from './catalog-items/catalog-items.module';
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
 import { EmployeesModule } from './employees/employees.module';
-import { InventoryCategoriesModule } from './inventory-categories/inventory-categories.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
-import { PaintTypesModule } from './paint-types/paint-types.module';
-import { PartMaterialsModule } from './part-materials/part-materials.module';
-import { PortfolioCategoriesModule } from './portfolio-categories/portfolio-categories.module';
-import { PortfolioProjectsModule } from './portfolio-projects/portfolio-projects.module';
-import { QuotesModule } from './quotes/quotes.module';
+import { OrdersModule } from './orders/orders.module';
+import { SalesModule } from './sales/sales.module';
 import { ServiceOrdersModule } from './service-orders/service-orders.module';
+import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
 import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
-import { SuppliersModule } from './suppliers/suppliers.module';
 
 @Module({
   imports: [
@@ -37,22 +32,26 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     }),
     EmployeesModule,
     CustomersModule,
-    ContactRequestsModule,
-    PaintTypesModule,
-    PartMaterialsModule,
-    QuotesModule,
-    CommissionRulesModule,
-    ServiceOrdersModule,
-    InventoryCategoriesModule,
-    SuppliersModule,
+    CatalogItemsModule,
+    OrdersModule,
     InventoryItemsModule,
     StockMovementsModule,
-    PortfolioCategoriesModule,
-    PortfolioProjectsModule,
-    CompanyEventsModule,
+    ShowcaseItemsModule,
     SiteSettingsModule,
+    SalesModule,
+    ServiceOrdersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    },
+  ],
 })
 export class AppModule {}

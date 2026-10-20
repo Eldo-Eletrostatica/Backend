@@ -8,74 +8,64 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Employee } from '../employees/entities/employee.entity';
 import { InventoryItem } from '../inventory-items/entities/inventory-item.entity';
+import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
+import { FindStockMovementsQueryDto } from './dto/find-stock-movements-query.dto';
+import { StockMovementResponseDto } from './dto/stock-movement-response.dto';
 import {
   StockMovement,
   StockMovementType,
 } from './entities/stock-movement.entity';
-import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
-import { FindStockMovementsQueryDto } from './dto/find-stock-movements-query.dto';
-import type { StockMovementResponseDto } from './dto/stock-movement-response.dto';
+
+const STOCK_QUANTITY_SCALE = 1000;
 
 @Injectable()
 export class StockMovementsService {
   constructor(
     @InjectRepository(StockMovement)
-    private readonly stockMovementRepository: Repository<StockMovement>,
+    private readonly stockMovements: Repository<StockMovement>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
 
-  create(input: CreateStockMovementDto) {
-    const inventoryItemId = this.requiredString(
-      input.inventoryItemId,
-      'inventoryItemId',
-    );
-    const employeeId = this.requiredString(input.employeeId, 'employeeId');
-    const type = input.type;
-    if (!Object.values(StockMovementType).includes(type)) {
-      throw new BadRequestException('Tipo de movimentação inválido');
-    }
-    const quantity = Number(input.quantity);
-    if (
-      !Number.isFinite(quantity) ||
-      quantity <= 0 ||
-      Math.round(quantity * 1000) !== quantity * 1000
-    ) {
-      throw new BadRequestException(
-        'Quantidade deve ser positiva e ter até três casas decimais',
-      );
-    }
-    const reason = this.requiredString(input.reason, 'reason');
-
+  create(input: CreateStockMovementDto): Promise<StockMovement> {
     return this.dataSource.transaction(async (manager) => {
       const item = await manager
         .getRepository(InventoryItem)
         .createQueryBuilder('item')
         .setLock('pessimistic_write')
-        .where('item.inventory_item_id = :inventoryItemId', { inventoryItemId })
+        .where('item.inventory_item_id = :inventoryItemId', {
+          inventoryItemId: input.inventoryItemId,
+        })
         .andWhere('item.deleted_at IS NULL')
         .getOne();
-      if (!item) throw new NotFoundException('Item não encontrado');
-      const employee = await manager
-        .getRepository(Employee)
-        .findOneBy({ employeeId });
-      if (!employee) throw new NotFoundException('Funcionário não encontrado');
+      if (item === null) {
+        throw new NotFoundException('Item não encontrado.');
+      }
+      const employee = await manager.findOne(Employee, {
+        where: { employeeId: input.employeeId },
+      });
+      if (employee === null) {
+        throw new NotFoundException('Funcionário não encontrado.');
+      }
 
-      const newBalance =
-        type === StockMovementType.Inbound
-          ? item.balance + quantity
-          : item.balance - quantity;
-      if (newBalance < 0) throw new ConflictException('Saldo insuficiente');
+      const newBalance = this.roundQuantity(
+        input.type === StockMovementType.Inbound
+          ? item.balance + input.quantity
+          : item.balance - input.quantity,
+      );
+      if (newBalance < 0) {
+        throw new ConflictException('Saldo insuficiente.');
+      }
 
-      item.balance = Math.round(newBalance * 1000) / 1000;
+      item.balance = newBalance;
       await manager.getRepository(InventoryItem).save(item);
       return manager.getRepository(StockMovement).save(
-        this.stockMovementRepository.create({
-          inventoryItemId,
-          employeeId,
-          type: type,
-          quantity,
-          reason,
+        this.stockMovements.create({
+          inventoryItemId: input.inventoryItemId,
+          employeeId: input.employeeId,
+          type: input.type,
+          quantity: input.quantity,
+          reason: input.reason,
           movedAt: new Date(),
         }),
       );
@@ -85,25 +75,29 @@ export class StockMovementsService {
   async findByPeriod(
     query: FindStockMovementsQueryDto,
   ): Promise<StockMovementResponseDto[]> {
-    const from = this.parseDate(query.from, 'from');
-    const to = this.parseDate(query.to, 'to');
-    if (from > to)
-      throw new BadRequestException('O início deve ser anterior ao fim');
-    const builder = this.stockMovementRepository
+    if (query.from > query.to) {
+      throw new BadRequestException('O início deve ser anterior ao fim.');
+    }
+    const from = new Date(`${query.from}T00:00:00.000Z`);
+    const toExclusive = new Date(`${query.to}T00:00:00.000Z`);
+    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+
+    const builder = this.stockMovements
       .createQueryBuilder('movement')
+      .withDeleted()
       .leftJoinAndSelect('movement.inventoryItem', 'item')
       .leftJoin('movement.employee', 'employee')
       .addSelect(['employee.employeeId', 'employee.name'])
       .where('movement.moved_at >= :from', { from })
-      .andWhere('movement.moved_at < :to', {
-        to: new Date(to.getTime() + 24 * 60 * 60 * 1000),
-      })
+      .andWhere('movement.moved_at < :toExclusive', { toExclusive })
       .orderBy('movement.moved_at', 'DESC');
-    if (query.inventoryItemId)
+    if (query.inventoryItemId !== undefined) {
       builder.andWhere('movement.inventory_item_id = :inventoryItemId', {
         inventoryItemId: query.inventoryItemId,
       });
+    }
     const movements = await builder.getMany();
+
     return movements.map((movement) => ({
       stockMovementId: movement.stockMovementId,
       inventoryItemId: movement.inventoryItemId,
@@ -124,23 +118,7 @@ export class StockMovementsService {
     }));
   }
 
-  private requiredString(value: unknown, field: string) {
-    if (typeof value !== 'string' || value.trim().length === 0)
-      throw new BadRequestException(`${field} é obrigatório`);
-    return value.trim();
-  }
-
-  private parseDate(value: string | undefined, field: string) {
-    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value))
-      throw new BadRequestException(
-        `${field} deve estar no formato AAAA-MM-DD`,
-      );
-    const date = new Date(`${value}T00:00:00.000Z`);
-    if (
-      Number.isNaN(date.getTime()) ||
-      date.toISOString().slice(0, 10) !== value
-    )
-      throw new BadRequestException(`${field} inválido`);
-    return date;
+  private roundQuantity(value: number): number {
+    return Math.round(value * STOCK_QUANTITY_SCALE) / STOCK_QUANTITY_SCALE;
   }
 }

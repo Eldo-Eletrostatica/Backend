@@ -22,7 +22,7 @@ Três repositórios separados na organização `Eldo-Eletrostatica`, que se comu
 As regras de produto vêm das User Stories. Cada US é uma issue no repo `Documentacao` (`gh issue view <n> --repo Eldo-Eletrostatica/Documentacao`), com sub-issues técnicas no `Frontend` e no `Backend`. Leia a US antes de implementar uma funcionalidade. Dois pontos que já confundiram:
 
 - A US04 (avaliação feita no próprio site) foi descontinuada: as avaliações vêm só do Google (US05).
-- O serviço de armazenamento de arquivos ainda está em avaliação pelo grupo. Pergunte antes de integrar um.
+- Imagens e PDFs ficam num armazenamento compatível com S3: SeaweedFS no `docker compose` do Backend em desenvolvimento e Cloudflare R2, na conta do cliente, em produção (ADR 0006). O banco guarda só a URL.
 
 ## Idioma
 
@@ -72,7 +72,7 @@ Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agen
 ## Este repo: Backend
 
 - Arquitetura MVC em camadas, com uma pasta por entidade. O controller é o Controller do MVC; o Model se divide em entity (os dados, a tabela) e service (a regra de negócio, a camada a mais); os DTOs definem o formato dos dados que entram e saem, e a View é o Frontend. O controller recebe a requisição, chama o service e devolve a resposta.
-- As 17 tabelas do modelo já têm pasta, entity e module em `src/<feature>/`. Ao implementar uma US de uma feature que já existe, gere pelo CLI do Nest só o que falta, na raiz do repo; o CLI registra o controller e o service no module existente:
+- As 9 tabelas do modelo (ADR 0005) já têm pasta, entity e module em `src/<feature>/`. Ao implementar uma US de uma feature que já existe, gere pelo CLI do Nest só o que falta, na raiz do repo; o CLI registra o controller e o service no module existente:
 
   ```bash
   npx -p @nestjs/cli@11 nest g controller <feature>
@@ -80,12 +80,14 @@ Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agen
   ```
 
   Uma feature nova, sem pasta, nasce com `npx -p @nestjs/cli@11 nest g resource <nome> --type rest --crud`. O `<nome>` vem do `GLOSSARY.md`, em inglês, kebab-case e no plural (`service-orders`): ele vira a pasta e a rota (`/service-orders`), e a entity e os DTOs saem no singular (`ServiceOrder`). O comando baixa o CLI porque o `node_modules` do host fica vazio: as dependências vivem no container.
+- O pedido passa por várias USs: contato, orçamento, venda, OS e consulta pelo protocolo (ADR 0005). `src/orders/` guarda só as entities `Order` e `OrderItem`. Cada caso de uso sobre o pedido tem módulo próprio, com o nome do termo do `GLOSSARY.md` (`src/sales/` para a venda da US21), com controller, service e DTOs, e importa o `OrdersModule` e os módulos das outras entities que usa. Assim cada US fica na sua pasta, sem disputar o mesmo service.
+- Arquivos (imagens e PDFs) passam pelo `StorageService` de `src/storage/` (ADR 0006): a feature importa o `StorageModule`, valida o formato e o tamanho do arquivo e chama `upload(arquivo, pasta)`, que devolve a URL a salvar no banco. Não instale outro SDK nem fale com o bucket por fora dele.
 - A entity gerada pelo `nest g resource` vem vazia. Adicione os decorators do TypeORM e registre a entity no module com `TypeOrmModule.forFeature([<Entity>])`; o `autoLoadEntities` do `app.module.ts` só carrega as entities registradas assim.
 - As entities usam propriedades em camelCase, gravadas no banco em snake_case pelo `SnakeNamingStrategy` (pacote `typeorm-naming-strategies`, configurado em `src/database/typeorm.config.ts`).
-- A PK de cada tabela se chama `<entidade>_id`, no singular (`customers.customer_id`, propriedade `customerId`), e não `id`. Uma FK tem exatamente o nome da PK que ela referencia (`quotes.customer_id`). Quando a FK representa um papel, o papel vira prefixo do nome da PK (`service_orders.seller_employee_id`). Declare o nome em toda relação com `@JoinColumn({ name: 'customer_id' })`: sem isso, o `SnakeNamingStrategy` junta o nome da relação ao da PK e gera `customer_customer_id`.
+- A PK de cada tabela se chama `<entidade>_id`, no singular (`customers.customer_id`, propriedade `customerId`), e não `id`. Uma FK tem exatamente o nome da PK que ela referencia (`orders.customer_id`). Quando a FK representa um papel, o papel vira prefixo do nome da PK (`orders.seller_employee_id`, `order_items.paint_catalog_item_id`). Declare o nome em toda relação com `@JoinColumn({ name: 'customer_id' })`: sem isso, o `SnakeNamingStrategy` junta o nome da relação ao da PK e gera `customer_customer_id`.
 - Siga o padrão das entities existentes: a FK é declarada como coluna (`customerId`, com `@Index`) logo antes da relação (`customer`); toda constraint tem nome (`PK_`, `FK_`, `IDX_`, `UQ_`, `CHK_` + tabela + coluna); enums são `varchar` com `@Check(enumCheck(...))`; colunas `numeric` saem dos helpers de `src/database/columns.ts` (`moneyColumn()`, `stockQuantityColumn()`...), que já aplicam o `numericTransformer`; tamanhos e limites com significado de negócio viram constantes (`EMAIL_MAX_LENGTH`, `MAX_PERCENTAGE`); `created_at`, `updated_at` e, nas tabelas da ADR 0002, `deleted_at` ficam no fim da classe.
 - O banco só muda por migration: o `synchronize` fica desligado e a API aplica as migrations pendentes ao subir. Depois de alterar uma entity, gere a migration com `docker compose exec backend npm run migration:generate -- src/database/migrations/<NomeDaMudanca>` e revise o SQL antes de commitar. Uma migration que já está na `main` não muda: corrija com uma migration nova.
 - Testes: unitários em `*.spec.ts` ao lado do arquivo testado; integração de endpoint em `test/*.e2e-spec.ts`, com supertest. Teste parametrizado usa `it.each` com pelo menos dois parâmetros por caso (exigência da disciplina).
 - Os testes de integração precisam do Postgres do `docker compose` no ar.
 - Pelo `docker compose`, a API responde em `localhost:3001` (porta 3000 dentro do container), porque a 3000 do host é do Frontend.
-- Antes de dar uma tarefa por pronta, rode `npm run lint` e `npm run test`.
+- Antes de dar uma tarefa por pronta, rode `npm run lint`, `npm run test` e, se mexeu em endpoint ou banco, `npm run test:e2e`. O PR só entra na `main` com o CI (`.github/workflows/ci.yml`) verde e a branch atualizada; um `package.json` alterado vai junto com o `package-lock.json`, porque o CI usa `npm ci`.

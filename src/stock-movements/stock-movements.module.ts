@@ -1,13 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EmployeesModule } from '../employees/employees.module';
+import { InventoryItemsModule } from '../inventory-items/inventory-items.module';
 import { StockMovement } from './entities/stock-movement.entity';
 import { StockMovementsController } from './stock-movements.controller';
 import { StockMovementsService } from './stock-movements.service';
-import { InventoryItem } from '../inventory-items/entities/inventory-item.entity';
-import { Employee } from '../employees/entities/employee.entity';
 
+// Balance and movement are written in one transaction. The imports declare
+// the other entities this module reads.
 @Module({
-  imports: [TypeOrmModule.forFeature([StockMovement, InventoryItem, Employee])],
+  imports: [
+    TypeOrmModule.forFeature([StockMovement]),
+    InventoryItemsModule,
+    EmployeesModule,
+  ],
   controllers: [StockMovementsController],
   providers: [StockMovementsService],
   exports: [TypeOrmModule],

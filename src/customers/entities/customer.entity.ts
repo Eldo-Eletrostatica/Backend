@@ -12,7 +12,9 @@ import { EMAIL_MAX_LENGTH } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
 
 // CNPJ has 14 digits and CPF has 11; both are stored without punctuation.
-const DOCUMENT_MAX_LENGTH = 14;
+export const DOCUMENT_MAX_LENGTH = 14;
+export const CUSTOMER_NAME_MAX_LENGTH = 150;
+export const PHONE_MAX_LENGTH = 20;
 
 export enum CustomerType {
   Individual = 'individual',
@@ -21,6 +23,10 @@ export enum CustomerType {
 
 @Entity('customers')
 @Check('CHK_customers_type', enumCheck('type', CustomerType))
+@Check(
+  'CHK_customers_document',
+  `"type" <> '${CustomerType.Business}' OR "document" IS NOT NULL`,
+)
 export class Customer {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_customers' })
   customerId: string;
@@ -28,21 +34,21 @@ export class Customer {
   @Column({ type: 'varchar', length: 20 })
   type: CustomerType;
 
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: CUSTOMER_NAME_MAX_LENGTH })
   name: string;
 
-  // CPF or CNPJ.
+  // CPF or CNPJ; an individual who only sent the contact form may have none.
   @Index('UQ_customers_document', {
     unique: true,
     where: '"deleted_at" IS NULL',
   })
-  @Column({ type: 'varchar', length: DOCUMENT_MAX_LENGTH })
-  document: string;
+  @Column({ type: 'varchar', length: DOCUMENT_MAX_LENGTH, nullable: true })
+  document: string | null;
 
   @Column({ type: 'varchar', length: EMAIL_MAX_LENGTH })
   email: string;
 
-  @Column({ type: 'varchar', length: 20 })
+  @Column({ type: 'varchar', length: PHONE_MAX_LENGTH })
   phone: string;
 
   @CreateDateColumn({ type: 'timestamptz' })

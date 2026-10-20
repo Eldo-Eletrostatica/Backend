@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "backend",
+      "credentials": [
+        {
+          "accessKey": "eldo-dev",
+          "secretKey": "eldo-dev-secret"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "anonymous",
+      "actions": ["Read"]
+    }
+  ]
+}

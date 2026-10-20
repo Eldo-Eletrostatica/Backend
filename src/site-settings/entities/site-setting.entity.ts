@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { MAX_PERCENTAGE } from '../../database/columns';
 import { numericTransformer } from '../../database/numeric.transformer';
+import { VisualSettings } from '../visual-settings';
 
 // Single-row table: the service reads and updates the only record, created by
 // the SeedSiteSettings migration.
@@ -24,11 +25,11 @@ export class SiteSetting {
 
   // Null means the site uses the default visual identity defined in code.
   @Column({ type: 'jsonb', nullable: true })
-  visualPublished: Record<string, unknown> | null;
+  visualPublished: VisualSettings | null;
 
   // Unpublished changes shown only in the admin preview.
   @Column({ type: 'jsonb', nullable: true })
-  visualDraft: Record<string, unknown> | null;
+  visualDraft: VisualSettings | null;
 
   @Column({ type: 'boolean', default: true })
   isEstimatorEnabled: boolean;

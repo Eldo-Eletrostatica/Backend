@@ -1,5 +1,9 @@
-import { ServiceOrderStatus } from '../entities/service-order.entity';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsIn } from 'class-validator';
+import { OrderStatus, SALE_STATUSES } from '../../orders/entities/order.entity';
 
-export interface UpdateServiceOrderStatusDto {
-  status: ServiceOrderStatus;
+export class UpdateServiceOrderStatusDto {
+  @ApiProperty({ enum: SALE_STATUSES, example: OrderStatus.InProduction })
+  @IsIn(SALE_STATUSES)
+  status: OrderStatus;
 }

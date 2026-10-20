@@ -5,21 +5,21 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { stockQuantityColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
-import { InventoryCategory } from '../../inventory-categories/entities/inventory-category.entity';
-import { Supplier } from '../../suppliers/entities/supplier.entity';
 
 export enum InventoryUnit {
   Kilogram = 'kg',
   Liter = 'liter',
   Unit = 'unit',
 }
+
+export const INVENTORY_ITEM_NAME_MAX_LENGTH = 150;
+export const INVENTORY_CATEGORY_MAX_LENGTH = 100;
+export const SUPPLIER_NAME_MAX_LENGTH = 150;
 
 @Entity('inventory_items')
 @Check('CHK_inventory_items_unit', enumCheck('unit', InventoryUnit))
@@ -31,30 +31,18 @@ export class InventoryItem {
   })
   inventoryItemId: string;
 
-  @Index('IDX_inventory_items_inventory_category_id')
-  @Column({ type: 'uuid' })
-  inventoryCategoryId: string;
-
-  @ManyToOne(() => InventoryCategory, { onDelete: 'RESTRICT' })
-  @JoinColumn({
-    name: 'inventory_category_id',
-    foreignKeyConstraintName: 'FK_inventory_items_inventory_category_id',
-  })
-  inventoryCategory: InventoryCategory;
-
-  @Index('IDX_inventory_items_supplier_id')
-  @Column({ type: 'uuid' })
-  supplierId: string;
-
-  @ManyToOne(() => Supplier, { onDelete: 'RESTRICT' })
-  @JoinColumn({
-    name: 'supplier_id',
-    foreignKeyConstraintName: 'FK_inventory_items_supplier_id',
-  })
-  supplier: Supplier;
-
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: INVENTORY_ITEM_NAME_MAX_LENGTH })
   name: string;
+
+  // Free text typed by the staff, such as paints or supplies.
+  @Index('IDX_inventory_items_category')
+  @Column({ type: 'varchar', length: INVENTORY_CATEGORY_MAX_LENGTH })
+  category: string;
+
+  // Only the name: the supplier's contact would depend on the supplier, not
+  // on the item, and break the third normal form.
+  @Column({ type: 'varchar', length: SUPPLIER_NAME_MAX_LENGTH })
+  supplierName: string;
 
   @Column({ type: 'varchar', length: 20 })
   unit: InventoryUnit;
