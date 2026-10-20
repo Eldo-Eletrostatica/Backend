@@ -20,7 +20,7 @@ import {
   OrderStatus,
   SALE_STATUSES,
 } from '../orders/entities/order.entity';
-import { calculateCommission } from './commission';
+import { CommissionCalculatorService } from '../commission-rules/commission-calculator.service';
 import { LaunchSaleDto } from './dto/launch-sale.dto';
 import { SaleCustomerDto } from './dto/sale-customer.dto';
 import { SaleItemDto } from './dto/sale-item.dto';
@@ -47,7 +47,10 @@ interface OrderToSell {
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly commissionCalculatorService: CommissionCalculatorService,
+  ) {}
 
   // Sale, tracking code and service order are the same row (ADR 0005), but the
   // customer, the items and the order are separate writes: one transaction
@@ -65,7 +68,11 @@ export class SalesService {
       const sale = {
         sellerEmployeeId: seller.employeeId,
         finalPrice,
-        commission: calculateCommission(seller, finalPrice),
+        commission: await this.commissionCalculatorService.calculateCommission(
+          seller.employeeId,
+          finalPrice,
+          manager,
+        ),
         soldAt: new Date(),
         trackingCode: await this.generateUniqueTrackingCode(manager),
         scope: dto.scope,

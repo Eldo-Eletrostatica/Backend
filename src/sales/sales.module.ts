@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CatalogItemsModule } from '../catalog-items/catalog-items.module';
+import { CommissionRulesModule } from '../commission-rules/commission-rules.module';
 import { CustomersModule } from '../customers/customers.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { OrdersModule } from '../orders/orders.module';
@@ -9,7 +10,13 @@ import { SalesService } from './sales.service';
 // The service writes through a single DataSource transaction; the imports
 // declare the entities it reads and writes.
 @Module({
-  imports: [OrdersModule, CustomersModule, EmployeesModule, CatalogItemsModule],
+  imports: [
+    OrdersModule,
+    CustomersModule,
+    EmployeesModule,
+    CatalogItemsModule,
+    CommissionRulesModule,
+  ],
   controllers: [SalesController],
   providers: [SalesService],
 })
