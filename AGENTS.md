@@ -22,7 +22,7 @@ Três repositórios separados na organização `Eldo-Eletrostatica`, que se comu
 As regras de produto vêm das User Stories. Cada US é uma issue no repo `Documentacao` (`gh issue view <n> --repo Eldo-Eletrostatica/Documentacao`), com sub-issues técnicas no `Frontend` e no `Backend`. Leia a US antes de implementar uma funcionalidade. Dois pontos que já confundiram:
 
 - A US04 (avaliação feita no próprio site) foi descontinuada: as avaliações vêm só do Google (US05).
-- O serviço de armazenamento de arquivos ainda está em avaliação pelo grupo. Pergunte antes de integrar um.
+- Imagens e PDFs ficam num armazenamento compatível com S3: SeaweedFS no `docker compose` do Backend em desenvolvimento e Cloudflare R2, na conta do cliente, em produção (ADR 0006). O banco guarda só a URL.
 
 ## Idioma
 
