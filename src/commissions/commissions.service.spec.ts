@@ -97,26 +97,6 @@ describe('CommissionsService', () => {
         ).rejects.toThrow(new BadRequestException(expectedMessage));
       },
     );
-
-    it.each([
-      ['2026-02-30', '2026-03-01', 'Data inicial inválida.'],
-      ['2026-13-01', '2026-12-31', 'Data inicial inválida.'],
-      ['2026-01-01', '2026-04-31', 'Data final inválida.'],
-    ])(
-      'lança BadRequestException para datas de calendário inexistentes (%s, %s)',
-      async (startDate, endDate) => {
-        const employeeId = '00000000-0000-0000-0000-000000000001';
-        mockEmployeeRepository.findOne.mockResolvedValue({
-          employeeId,
-        });
-
-        const query: GetCommissionsQueryDto = { startDate, endDate };
-
-        await expect(
-          service.getAccumulatedCommissions(employeeId, query),
-        ).rejects.toThrow(BadRequestException);
-      },
-    );
   });
 
   describe('Cálculo de comissões acumuladas', () => {

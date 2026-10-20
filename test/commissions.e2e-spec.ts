@@ -264,6 +264,18 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
         'formato inválido de endDate',
         { startDate: '2026-10-01', endDate: '31-10-2026' },
       ],
+      [
+        'startDate inexistente no calendário',
+        { startDate: '2026-02-30', endDate: '2026-03-31' },
+      ],
+      [
+        'endDate inexistente no calendário',
+        { startDate: '2026-04-01', endDate: '2026-04-31' },
+      ],
+      [
+        'data com horário',
+        { startDate: '2026-10-01T10:00:00Z', endDate: '2026-10-31' },
+      ],
     ])(
       'rejeita parâmetros ausentes ou com formato incorreto: %s',
       async (_, query) => {
