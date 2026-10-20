@@ -1,31 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { CommissionType } from '../employees/entities/employee.entity';
 import { CommissionRulesController } from './commission-rules.controller';
 import { CommissionRulesService } from './commission-rules.service';
 import { CommissionRuleResponseDto } from './dto/commission-rule-response.dto';
-import { CreateCommissionRuleDto } from './dto/create-commission-rule.dto';
-import {
-  CommissionCalculationType,
-  CommissionScope,
-} from './entities/commission-rule.entity';
-import { AdminGuard } from './guards/admin.guard';
+import { UpdateCommissionRuleDto } from './dto/update-commission-rule.dto';
 
 describe('CommissionRulesController', () => {
   let controller: CommissionRulesController;
   let mockService: {
-    create: jest.Mock;
-    findAll: jest.Mock;
-    findOne: jest.Mock;
-    update: jest.Mock;
-    remove: jest.Mock;
+    getRule: jest.Mock;
+    updateRule: jest.Mock;
   };
 
   beforeEach(async () => {
     mockService = {
-      create: jest.fn(),
-      findAll: jest.fn(),
-      findOne: jest.fn(),
-      update: jest.fn(),
-      remove: jest.fn(),
+      getRule: jest.fn(),
+      updateRule: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -36,10 +26,7 @@ describe('CommissionRulesController', () => {
           useValue: mockService,
         },
       ],
-    })
-      .overrideGuard(AdminGuard)
-      .useValue({ canActivate: () => true })
-      .compile();
+    }).compile();
 
     controller = module.get<CommissionRulesController>(
       CommissionRulesController,
@@ -47,74 +34,52 @@ describe('CommissionRulesController', () => {
   });
 
   it.each([
-    ['Regra 1', CommissionCalculationType.Percentage, 5],
-    ['Regra 2', CommissionCalculationType.Fixed, 50],
+    ['emp-1', CommissionType.Percentage, 5],
+    ['emp-2', CommissionType.Fixed, 80],
+    ['emp-3', null, null],
   ])(
-    'chama create com nome %s, tipo %s e valor %s',
-    async (name, calculationType, value) => {
-      const dto: CreateCommissionRuleDto = {
-        name,
-        calculationType,
-        value,
-        scope: CommissionScope.Global,
-      };
+    'delegates getRule for employee %s with type %s and value %s',
+    async (employeeId, commissionType, commissionValue) => {
       const response: CommissionRuleResponseDto = {
-        commissionRuleId: 'uuid',
-        name,
-        description: null,
-        calculationType,
-        value,
-        scope: CommissionScope.Global,
-        employeeId: null,
-        minAmount: 0,
-        maxAmount: null,
-        isActive: true,
-        createdAt: new Date(),
+        employeeId,
+        commissionType,
+        commissionValue,
         updatedAt: new Date(),
       };
-      mockService.create.mockResolvedValue(response);
+      mockService.getRule.mockResolvedValue(response);
 
-      const result = await controller.create(dto);
-      expect(mockService.create).toHaveBeenCalledWith(dto);
-      expect(result.name).toBe(name);
+      const result = await controller.getRule(employeeId);
+      expect(mockService.getRule).toHaveBeenCalledWith(employeeId);
+      expect(result.employeeId).toBe(employeeId);
+      expect(result.commissionType).toBe(commissionType);
+      expect(result.commissionValue).toBe(commissionValue);
     },
   );
 
   it.each([
-    [CommissionScope.Global, true],
-    [CommissionScope.Employee, false],
-  ])('chama findAll com escopo %s e isActive %s', async (scope, isActive) => {
-    mockService.findAll.mockResolvedValue([]);
-    await controller.findAll({ scope, isActive });
-    expect(mockService.findAll).toHaveBeenCalledWith({ scope, isActive });
-  });
+    ['emp-1', CommissionType.Percentage, 5],
+    ['emp-2', CommissionType.Fixed, 80],
+    ['emp-3', null, null],
+  ])(
+    'delegates updateRule for employee %s with type %s and value %s',
+    async (employeeId, commissionType, commissionValue) => {
+      const dto: UpdateCommissionRuleDto = {
+        commissionType,
+        commissionValue,
+      };
+      const response: CommissionRuleResponseDto = {
+        employeeId,
+        commissionType,
+        commissionValue,
+        updatedAt: new Date(),
+      };
+      mockService.updateRule.mockResolvedValue(response);
 
-  it.each([
-    ['uuid-1', 'Regra A'],
-    ['uuid-2', 'Regra B'],
-  ])('chama findOne para id %s e retorna %s', async (id, name) => {
-    mockService.findOne.mockResolvedValue({ commissionRuleId: id, name });
-    const result = await controller.findOne(id);
-    expect(mockService.findOne).toHaveBeenCalledWith(id);
-    expect(result.commissionRuleId).toBe(id);
-  });
-
-  it.each([
-    ['uuid-1', 'Atualizado 1'],
-    ['uuid-2', 'Atualizado 2'],
-  ])('chama update para id %s com novo nome %s', async (id, name) => {
-    mockService.update.mockResolvedValue({ commissionRuleId: id, name });
-    const result = await controller.update(id, { name });
-    expect(mockService.update).toHaveBeenCalledWith(id, { name });
-    expect(result.name).toBe(name);
-  });
-
-  it.each([['uuid-del-1'], ['uuid-del-2']])(
-    'chama remove para id %s',
-    async (id) => {
-      mockService.remove.mockResolvedValue(undefined);
-      await controller.remove(id);
-      expect(mockService.remove).toHaveBeenCalledWith(id);
+      const result = await controller.updateRule(employeeId, dto);
+      expect(mockService.updateRule).toHaveBeenCalledWith(employeeId, dto);
+      expect(result.employeeId).toBe(employeeId);
+      expect(result.commissionType).toBe(commissionType);
+      expect(result.commissionValue).toBe(commissionValue);
     },
   );
 });

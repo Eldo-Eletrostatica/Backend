@@ -1,61 +1,29 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Employee } from '../employees/entities/employee.entity';
-import { CommissionRulesService } from './commission-rules.service';
-import { CreateCommissionRuleDto } from './dto/create-commission-rule.dto';
 import {
-  CommissionCalculationType,
-  CommissionRule,
-  CommissionScope,
-} from './entities/commission-rule.entity';
+  CommissionType,
+  Employee,
+} from '../employees/entities/employee.entity';
+import { CommissionRulesService } from './commission-rules.service';
+import { UpdateCommissionRuleDto } from './dto/update-commission-rule.dto';
 
 describe('CommissionRulesService', () => {
   let service: CommissionRulesService;
-  let mockRuleRepository: {
-    create: jest.Mock;
-    save: jest.Mock;
-    findOne: jest.Mock;
-    createQueryBuilder: jest.Mock;
-    softDelete: jest.Mock;
-  };
   let mockEmployeeRepository: {
     findOne: jest.Mock;
+    save: jest.Mock;
   };
 
   beforeEach(async () => {
-    mockRuleRepository = {
-      create: jest.fn(
-        (dto: Partial<CommissionRule>): CommissionRule =>
-          ({
-            commissionRuleId: 'rule-uuid-1',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            deletedAt: null,
-            ...dto,
-          }) as CommissionRule,
-      ),
-      save: jest.fn((rule: CommissionRule) => Promise.resolve(rule)),
-      findOne: jest.fn(),
-      createQueryBuilder: jest.fn(),
-      softDelete: jest.fn(),
-    };
-
     mockEmployeeRepository = {
       findOne: jest.fn(),
+      save: jest.fn((emp: Employee) => Promise.resolve(emp)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommissionRulesService,
-        {
-          provide: getRepositoryToken(CommissionRule),
-          useValue: mockRuleRepository,
-        },
         {
           provide: getRepositoryToken(Employee),
           useValue: mockEmployeeRepository,
@@ -66,314 +34,175 @@ describe('CommissionRulesService', () => {
     service = module.get<CommissionRulesService>(CommissionRulesService);
   });
 
-  describe('create - cenários de sucesso', () => {
+  describe('updateRule - successful updates', () => {
     it.each([
-      [
-        'Comissão Global 0-5k',
-        CommissionCalculationType.Percentage,
-        3,
-        0,
-        5000,
-      ],
-      [
-        'Comissão Global 5-10k',
-        CommissionCalculationType.Percentage,
-        5,
-        5000.01,
-        10000,
-      ],
+      [CommissionType.Percentage, 5],
+      [CommissionType.Percentage, 2.5],
+      [CommissionType.Fixed, 150],
+      [CommissionType.Fixed, 80],
     ])(
-      'cadastra regra global percentual por faixa com sucesso (Cenário 1): %s',
-      async (name, calculationType, value, minAmount, maxAmount) => {
-        const mockQb = {
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([]),
-        };
-        mockRuleRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-        const dto: CreateCommissionRuleDto = {
-          name,
-          calculationType,
-          value,
-          scope: CommissionScope.Global,
-          minAmount,
-          maxAmount,
-        };
-
-        const result = await service.create(dto);
-        expect(result.name).toBe(name);
-        expect(result.scope).toBe(CommissionScope.Global);
-        expect(result.employeeId).toBeNull();
-        expect(result.minAmount).toBe(minAmount);
-        expect(result.maxAmount).toBe(maxAmount);
-      },
-    );
-
-    it.each([
-      ['emp-joao-id', 80, 10000.01, null],
-      ['emp-maria-id', 120, 20000, 50000],
-    ])(
-      'cadastra regra fixa específica por funcionário com sucesso (Cenário 2): %s',
-      async (employeeId, value, minAmount, maxAmount) => {
-        mockEmployeeRepository.findOne.mockResolvedValue({
+      'updates employee commission rule to type %s and value %s',
+      async (commissionType, commissionValue) => {
+        const employeeId = 'emp-uuid-1';
+        const existingEmployee = {
           employeeId,
-          name: 'Funcionário Teste',
+          commissionType: null,
+          commissionValue: null,
+          updatedAt: new Date(),
+        } as Employee;
+
+        mockEmployeeRepository.findOne.mockResolvedValue(existingEmployee);
+
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
+        };
+
+        const result = await service.updateRule(employeeId, dto);
+
+        expect(mockEmployeeRepository.findOne).toHaveBeenCalledWith({
+          where: { employeeId },
         });
+        expect(mockEmployeeRepository.save).toHaveBeenCalled();
+        expect(result.commissionType).toBe(commissionType);
+        expect(result.commissionValue).toBe(commissionValue);
+      },
+    );
 
-        const mockQb = {
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([]),
-        };
-        mockRuleRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Especial',
-          calculationType: CommissionCalculationType.Fixed,
-          value,
-          scope: CommissionScope.Employee,
+    it.each([
+      [null, null, 'emp-1'],
+      [null, null, 'emp-2'],
+    ])(
+      'clears commission rule when both type and value are null for %s',
+      async (commissionType, commissionValue, employeeId) => {
+        const existingEmployee = {
           employeeId,
-          minAmount,
-          maxAmount: maxAmount ?? undefined,
+          commissionType: CommissionType.Percentage,
+          commissionValue: 5,
+          updatedAt: new Date(),
+        } as Employee;
+
+        mockEmployeeRepository.findOne.mockResolvedValue(existingEmployee);
+
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
         };
 
-        const result = await service.create(dto);
-        expect(result.employeeId).toBe(employeeId);
-        expect(result.calculationType).toBe(CommissionCalculationType.Fixed);
-        expect(result.value).toBe(value);
+        const result = await service.updateRule(employeeId, dto);
+
+        expect(result.commissionType).toBeNull();
+        expect(result.commissionValue).toBeNull();
       },
     );
   });
 
-  describe('create - validação de conflito de faixas (Cenário 3)', () => {
+  describe('updateRule - validation errors', () => {
     it.each([
-      [1000, 3000, 2000, 4000],
-      [0, 5000, 1000, 2000],
-      [5000, null, 8000, null],
-      [1000, 5000, 500, 1000],
+      [CommissionType.Percentage, null, 'type provided without value'],
+      [null, 5, 'value provided without type'],
+      [CommissionType.Fixed, null, 'fixed type without value'],
     ])(
-      'rejeita cadastro com ConflictException quando faixa [%s, %s] conflita com [%s, %s]',
-      async (existingMin, existingMax, candMin, candMax) => {
-        const existingRule = {
-          commissionRuleId: 'rule-existente',
-          scope: CommissionScope.Global,
-          employeeId: null,
-          minAmount: existingMin,
-          maxAmount: existingMax,
-          isActive: true,
+      'throws BadRequestException on mismatched pair (%s, %s): %s',
+      async (commissionType, commissionValue) => {
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
         };
 
-        const mockQb = {
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([existingRule]),
-        };
-        mockRuleRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Conflitante',
-          calculationType: CommissionCalculationType.Percentage,
-          value: 5,
-          scope: CommissionScope.Global,
-          minAmount: candMin,
-          maxAmount: candMax ?? undefined,
-        };
-
-        await expect(service.create(dto)).rejects.toThrow(ConflictException);
-      },
-    );
-  });
-
-  describe('create - validações de entrada inválida', () => {
-    it.each([
-      [0, CommissionCalculationType.Percentage],
-      [-10, CommissionCalculationType.Fixed],
-    ])(
-      'rejeita valor da regra (%s) inválido para tipo %s',
-      async (value, calculationType) => {
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Inválida',
-          calculationType,
-          value,
-          scope: CommissionScope.Global,
-        };
-
-        await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+        await expect(service.updateRule('emp-1', dto)).rejects.toThrow(
+          BadRequestException,
+        );
       },
     );
 
     it.each([
-      [100.01, CommissionCalculationType.Percentage],
-      [150, CommissionCalculationType.Percentage],
+      [CommissionType.Percentage, 0],
+      [CommissionType.Percentage, -5],
+      [CommissionType.Fixed, 0],
+      [CommissionType.Fixed, -50],
     ])(
-      'rejeita percentual superior a 100%% (%s)',
-      async (value, calculationType) => {
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Inválida',
-          calculationType,
-          value,
-          scope: CommissionScope.Global,
+      'throws BadRequestException when commission value (%s) is <= 0 for type %s',
+      async (commissionType, commissionValue) => {
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
         };
 
-        await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+        await expect(service.updateRule('emp-1', dto)).rejects.toThrow(
+          BadRequestException,
+        );
       },
     );
 
     it.each([
-      [CommissionScope.Employee, undefined, 'sem employeeId'],
-      [
-        CommissionScope.Global,
-        'some-emp-id',
-        'com employeeId em escopo global',
-      ],
-    ])('rejeita inconsistência de escopo %s: %s', async (scope, employeeId) => {
-      const dto: CreateCommissionRuleDto = {
-        name: 'Regra Escopo Inválido',
-        calculationType: CommissionCalculationType.Fixed,
-        value: 50,
-        scope,
-        employeeId,
-      };
-
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
-    });
-
-    it.each([
-      [-1, 1000, 'minAmount negativo'],
-      [5000, 2000, 'minAmount maior que maxAmount'],
+      [CommissionType.Percentage, 100.01],
+      [CommissionType.Percentage, 150],
     ])(
-      'rejeita limites inválidos de faixa (%s, %s): %s',
-      async (minAmount, maxAmount) => {
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Faixa Inválida',
-          calculationType: CommissionCalculationType.Fixed,
-          value: 50,
-          scope: CommissionScope.Global,
-          minAmount,
-          maxAmount,
+      'throws BadRequestException when percentage (%s) exceeds 100%%',
+      async (commissionType, commissionValue) => {
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
         };
 
-        await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+        await expect(service.updateRule('emp-1', dto)).rejects.toThrow(
+          BadRequestException,
+        );
       },
     );
 
     it.each([
-      ['emp-inexistente-1', 'Funcionário não encontrado.'],
-      ['emp-inexistente-2', 'Funcionário não encontrado.'],
+      ['non-existent-1', 'emp-1'],
+      ['non-existent-2', 'emp-2'],
     ])(
-      'lança NotFoundException quando funcionário %s não existe',
+      'throws NotFoundException when employee %s is not found',
       async (employeeId) => {
         mockEmployeeRepository.findOne.mockResolvedValue(null);
 
-        const dto: CreateCommissionRuleDto = {
-          name: 'Regra Func Inexistente',
-          calculationType: CommissionCalculationType.Fixed,
-          value: 50,
-          scope: CommissionScope.Employee,
-          employeeId,
+        const dto: UpdateCommissionRuleDto = {
+          commissionType: CommissionType.Percentage,
+          commissionValue: 5,
         };
 
-        await expect(service.create(dto)).rejects.toThrow(NotFoundException);
+        await expect(service.updateRule(employeeId, dto)).rejects.toThrow(
+          NotFoundException,
+        );
       },
     );
   });
 
-  describe('findAll, findOne, update e remove', () => {
+  describe('getRule', () => {
     it.each([
-      [CommissionScope.Global, true],
-      [CommissionScope.Employee, false],
+      ['emp-1', CommissionType.Percentage, 5],
+      ['emp-2', CommissionType.Fixed, 100],
+      ['emp-3', null, null],
     ])(
-      'lista regras filtrando por escopo %s e isActive %s',
-      async (scope, isActive) => {
-        const mockQb = {
-          andWhere: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([
-            {
-              commissionRuleId: 'r1',
-              name: 'Regra 1',
-              scope,
-              isActive,
-              minAmount: 0,
-              maxAmount: null,
-              value: 5,
-              calculationType: CommissionCalculationType.Percentage,
-            },
-          ]),
-        };
-        mockRuleRepository.createQueryBuilder.mockReturnValue(mockQb);
+      'returns current commission rule for employee %s (%s, %s)',
+      async (employeeId, commissionType, commissionValue) => {
+        const employee = {
+          employeeId,
+          commissionType,
+          commissionValue,
+          updatedAt: new Date(),
+        } as Employee;
 
-        const result = await service.findAll({ scope, isActive });
-        expect(result).toHaveLength(1);
-        expect(result[0].scope).toBe(scope);
+        mockEmployeeRepository.findOne.mockResolvedValue(employee);
+
+        const result = await service.getRule(employeeId);
+        expect(result.employeeId).toBe(employeeId);
+        expect(result.commissionType).toBe(commissionType);
+        expect(result.commissionValue).toBe(commissionValue);
       },
     );
 
-    it.each([
-      ['valid-uuid-1', 'Regra 1'],
-      ['valid-uuid-2', 'Regra 2'],
-    ])('busca regra existente por id %s (%s)', async (id, name) => {
-      mockRuleRepository.findOne.mockResolvedValue({
-        commissionRuleId: id,
-        name,
-        scope: CommissionScope.Global,
-        minAmount: 0,
-        maxAmount: null,
-        value: 10,
-        calculationType: CommissionCalculationType.Percentage,
-      });
-
-      const result = await service.findOne(id);
-      expect(result.commissionRuleId).toBe(id);
-      expect(result.name).toBe(name);
-    });
-
-    it.each([['invalid-id-1'], ['invalid-id-2']])(
-      'lança NotFoundException ao buscar id inexistente %s',
-      async (id) => {
-        mockRuleRepository.findOne.mockResolvedValue(null);
-        await expect(service.findOne(id)).rejects.toThrow(NotFoundException);
-      },
-    );
-
-    it.each([
-      ['r1', 'Novo Nome', 10],
-      ['r2', 'Outro Nome', 15],
-    ])(
-      'atualiza regra %s com novo nome (%s) e valor (%s)',
-      async (id, name, value) => {
-        const existing = {
-          commissionRuleId: id,
-          name: 'Antigo',
-          scope: CommissionScope.Global,
-          calculationType: CommissionCalculationType.Percentage,
-          value: 5,
-          minAmount: 0,
-          maxAmount: 1000,
-          isActive: true,
-        };
-        mockRuleRepository.findOne.mockResolvedValue(existing);
-
-        const mockQb = {
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getMany: jest.fn().mockResolvedValue([]),
-        };
-        mockRuleRepository.createQueryBuilder.mockReturnValue(mockQb);
-
-        const result = await service.update(id, { name, value });
-        expect(result.name).toBe(name);
-        expect(result.value).toBe(value);
-      },
-    );
-
-    it.each([['del-1'], ['del-2']])(
-      'aplica soft delete na regra %s',
-      async (id) => {
-        mockRuleRepository.findOne.mockResolvedValue({ commissionRuleId: id });
-        await service.remove(id);
-        expect(mockRuleRepository.softDelete).toHaveBeenCalledWith(id);
+    it.each([['missing-1'], ['missing-2']])(
+      'throws NotFoundException when retrieving rule for missing employee %s',
+      async (employeeId) => {
+        mockEmployeeRepository.findOne.mockResolvedValue(null);
+        await expect(service.getRule(employeeId)).rejects.toThrow(
+          NotFoundException,
+        );
       },
     );
   });
