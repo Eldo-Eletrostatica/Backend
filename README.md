@@ -144,6 +144,22 @@ docker compose exec postgres psql -U postgres -c '\l'
 docker compose exec postgres psql -U postgres -c '\dt'
 ```
 
+## Integração contínua
+
+Todo PR para a `main` e todo push nela rodam o workflow `.github/workflows/ci.yml` no GitHub Actions: `npm ci`, `lint:check`, `build`, testes unitários e testes de integração contra um Postgres de serviço.
+
+A `main` é protegida: só recebe mudanças por PR, e o PR só pode ser mergeado com o check **Lint, build e testes** verde e a branch atualizada com a `main`. A regra vale também para administradores.
+
+Para não descobrir o erro só no CI, rode antes de abrir o PR:
+
+```bash
+docker compose exec backend npm run lint:check
+docker compose exec backend npm run test
+docker compose exec backend npm run test:e2e
+```
+
+Como o CI usa `npm ci`, um `package.json` alterado sem o `package-lock.json` correspondente quebra o build: commite os dois juntos.
+
 ## Scripts
 
 | Comando | Descrição |
@@ -151,7 +167,8 @@ docker compose exec postgres psql -U postgres -c '\dt'
 | `npm run start:dev` | Inicia o servidor de desenvolvimento com hot-reload |
 | `npm run build` | Gera o build de produção |
 | `npm run start:prod` | Inicia o build de produção (`dist/main.js`) |
-| `npm run lint` | Executa o linter |
+| `npm run lint` | Executa o linter e corrige o que for automático |
+| `npm run lint:check` | Executa o linter sem alterar arquivos (usado no CI) |
 | `npm run test` | Executa os testes unitários |
 | `npm run test:e2e` | Executa os testes end-to-end (precisam do Postgres no ar; rode com `docker compose exec backend npm run test:e2e`) |
 | `npm run migration:run` | Aplica as migrations pendentes |
