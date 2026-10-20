@@ -77,6 +77,12 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
     return employeeId;
   }
 
+  function utcDateFromToday(dayOffset: number): string {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + dayOffset);
+    return date.toISOString().slice(0, 10);
+  }
+
   function randomDocument(): string {
     return String(randomInt(0, 99_999_999)).padStart(8, '0') + '000199';
   }
@@ -156,7 +162,6 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
     it('Critério 1: calcula o total acumulado das comissões do vendedor no período', async () => {
       const employeeId = await createTestEmployee();
 
-      // Duas vendas dentro do período (outubro de 2026)
       await insertSoldOrder(
         employeeId,
         1500,
@@ -170,7 +175,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
         new Date('2026-10-20T10:30:00.000Z'),
       );
 
-      // Uma venda de outro vendedor dentro do período (não deve somar)
+      // Another seller's sale in the same period must not count.
       const otherEmployeeId = await createTestEmployee();
       await insertSoldOrder(
         otherEmployeeId,
@@ -179,7 +184,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
         new Date('2026-10-15T12:00:00.000Z'),
       );
 
-      // Uma venda do mesmo vendedor fora do período (novembro - não deve somar)
+      // A sale outside the period must not count.
       await insertSoldOrder(
         employeeId,
         3000,
@@ -203,20 +208,24 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
     });
 
     it('Critério 3: reflete imediatamente a nova comissão quando uma nova venda é lançada', async () => {
-      // 1. Vendedor com regra de comissão percentual de 5%
       const employeeId = await createTestEmployee(CommissionType.Percentage, 5);
+      // The sale is stamped with the current instant; a UTC range from
+      // yesterday to tomorrow always contains today in Brasília time.
+      const period = {
+        startDate: utcDateFromToday(-1),
+        endDate: utcDateFromToday(1),
+      };
 
-      // 2. Consulta inicial em outubro (sem vendas)
       const initialRes = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
-        .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
+        .query(period)
         .expect(200);
 
       expect(
         (initialRes.body as AccumulatedCommissionsResponseDto).totalCommission,
       ).toBe(0);
 
-      // 3. Lança venda via endpoint /sales de R$ 2.000,00 (comissão de 5% = R$ 100,00)
+      // 5% of R$ 2,000.00 is R$ 100.00.
       const orderId = await insertApprovedOrder(2000);
       await request(app.getHttpServer())
         .post('/sales')
@@ -228,11 +237,9 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
         })
         .expect(201);
 
-      // 4. Volta a consultar o período e constata que a comissão reflete imediatamente
-      const todayIso = new Date().toISOString().slice(0, 10);
       const updatedRes = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
-        .query({ startDate: todayIso, endDate: todayIso })
+        .query(period)
         .expect(200);
 
       const updatedBody = updatedRes.body as AccumulatedCommissionsResponseDto;
@@ -305,7 +312,6 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
     it('retorna 404 para funcionário com exclusão lógica (deleted_at)', async () => {
       const employeeId = await createTestEmployee();
 
-      // Soft delete do funcionário
       await dataSource.query(
         `UPDATE employees SET deleted_at = NOW() WHERE employee_id = $1`,
         [employeeId],

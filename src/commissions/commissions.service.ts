@@ -12,6 +12,9 @@ import { GetCommissionsQueryDto } from './dto/get-commissions-query.dto';
 
 const DATE_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/;
 const CENTS_PER_REAL = 100;
+// Brazil has had no daylight saving time since 2019, so Brasília is always
+// UTC-3.
+const BRASILIA_UTC_OFFSET = '-03:00';
 
 export function parseBrasiliaDate(dateStr: string, isEndOfDay: boolean): Date {
   const match = DATE_REGEX.exec(dateStr);
@@ -35,8 +38,8 @@ export function parseBrasiliaDate(dateStr: string, isEndOfDay: boolean): Date {
     );
   }
 
-  const time = isEndOfDay ? '23:59:59.999-03:00' : '00:00:00.000-03:00';
-  return new Date(`${dateStr}T${time}`);
+  const time = isEndOfDay ? '23:59:59.999' : '00:00:00.000';
+  return new Date(`${dateStr}T${time}${BRASILIA_UTC_OFFSET}`);
 }
 
 @Injectable()
