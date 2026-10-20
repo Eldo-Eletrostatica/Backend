@@ -89,4 +89,4 @@ Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agen
 - Testes: unitários em `*.spec.ts` ao lado do arquivo testado; integração de endpoint em `test/*.e2e-spec.ts`, com supertest. Teste parametrizado usa `it.each` com pelo menos dois parâmetros por caso (exigência da disciplina).
 - Os testes de integração precisam do Postgres do `docker compose` no ar.
 - Pelo `docker compose`, a API responde em `localhost:3001` (porta 3000 dentro do container), porque a 3000 do host é do Frontend.
-- Antes de dar uma tarefa por pronta, rode `npm run lint` e `npm run test`.
+- Antes de dar uma tarefa por pronta, rode `npm run lint`, `npm run test` e, se mexeu em endpoint ou banco, `npm run test:e2e`. O PR só entra na `main` com o CI (`.github/workflows/ci.yml`) verde e a branch atualizada; um `package.json` alterado vai junto com o `package-lock.json`, porque o CI usa `npm ci`.
