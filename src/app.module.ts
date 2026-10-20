@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -9,6 +10,7 @@ import { createTypeOrmOptions } from './database/typeorm.config';
 import { EmployeesModule } from './employees/employees.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { OrdersModule } from './orders/orders.module';
+import { SalesModule } from './sales/sales.module';
 import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
 import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
@@ -35,8 +37,19 @@ import { StockMovementsModule } from './stock-movements/stock-movements.module';
     StockMovementsModule,
     ShowcaseItemsModule,
     SiteSettingsModule,
+    SalesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    },
+  ],
 })
 export class AppModule {}

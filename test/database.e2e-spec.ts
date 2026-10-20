@@ -142,4 +142,23 @@ describe('Schema do banco (e2e)', () => {
     await queryRunner.query(INSERT_SQL_BY_TABLE.customers('12345678000199'));
     await expect(queryRunner.query(sql)).resolves.toBeDefined();
   });
+
+  it.each([
+    [
+      'alteração do protocolo para outro código',
+      `UPDATE orders SET tracking_code = 'XYZ98765'`,
+    ],
+    ['remoção do protocolo com NULL', `UPDATE orders SET tracking_code = NULL`],
+  ])('rejeita %s após preenchido', async (_case, updateSql) => {
+    await queryRunner.query(INSERT_SQL_BY_TABLE.employees('vendedor@eldo.com'));
+    await queryRunner.query(INSERT_SQL_BY_TABLE.customers('12345678000199'));
+    await queryRunner.query(`
+      INSERT INTO orders (customer_id, seller_employee_id, source, status, final_price, commission, sold_at, tracking_code, scope, due_date)
+      SELECT c.customer_id, e.employee_id, 'internal', 'queued', 1000, 50, now(), 'ABC12345', 'Pintura', '2030-01-01'
+        FROM customers c, employees e
+    `);
+    await expect(queryRunner.query(updateSql)).rejects.toThrow(
+      /tracking_code is immutable once set/,
+    );
+  });
 });
