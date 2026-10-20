@@ -1,9 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, ValidateIf } from 'class-validator';
+import { IsEnum, IsNumber, Max, ValidateIf } from 'class-validator';
 import { CommissionType } from '../../employees/entities/employee.entity';
 
 const MONEY_DECIMAL_PLACES = 2;
+
+// commissionValue is numeric(12,2).
+export const MAX_COMMISSION_VALUE = 9_999_999_999.99;
 
 export class UpdateCommissionRuleDto {
   @ApiPropertyOptional({
@@ -11,7 +14,7 @@ export class UpdateCommissionRuleDto {
     nullable: true,
     example: CommissionType.Percentage,
     description:
-      'Commission calculation type (percentage or fixed); null to clear rule',
+      'Tipo de cálculo da comissão: percentual ou valor fixo; nulo para remover a regra',
   })
   @ValidateIf((_, value) => value !== null)
   @IsEnum(CommissionType)
@@ -22,10 +25,11 @@ export class UpdateCommissionRuleDto {
     nullable: true,
     example: 5,
     description:
-      'Commission value (percentage 0.01-100 or fixed amount in BRL); null to clear rule',
+      'Valor da comissão: percentual (0,01 a 100) ou valor fixo em reais; nulo para remover a regra',
   })
   @ValidateIf((_, value) => value !== null)
   @IsNumber({ maxDecimalPlaces: MONEY_DECIMAL_PLACES })
+  @Max(MAX_COMMISSION_VALUE)
   @Type(() => Number)
   commissionValue: number | null;
 }

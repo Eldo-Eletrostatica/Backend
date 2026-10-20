@@ -4,7 +4,7 @@ import { CommissionType } from '../../employees/entities/employee.entity';
 export class CommissionRuleResponseDto {
   @ApiProperty({
     example: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    description: 'Unique identifier of the employee',
+    description: 'Identificador único do funcionário',
   })
   employeeId: string;
 
@@ -12,7 +12,7 @@ export class CommissionRuleResponseDto {
     enum: CommissionType,
     nullable: true,
     example: CommissionType.Percentage,
-    description: 'Commission calculation type (percentage or fixed)',
+    description: 'Tipo de cálculo da comissão: percentual ou valor fixo',
   })
   commissionType: CommissionType | null;
 
@@ -20,13 +20,13 @@ export class CommissionRuleResponseDto {
     type: Number,
     nullable: true,
     example: 5,
-    description: 'Commission value (percentage or fixed amount in BRL)',
+    description: 'Valor da comissão em percentual ou reais',
   })
   commissionValue: number | null;
 
   @ApiProperty({
     example: '2026-10-20T10:00:00.000Z',
-    description: 'Timestamp when the employee record was last updated',
+    description: 'Data e hora da última atualização do registro',
   })
   updatedAt: Date;
 }

@@ -153,11 +153,28 @@ describe('CommissionRulesService', () => {
     );
 
     it.each([
-      ['non-existent-1', 'emp-1'],
-      ['non-existent-2', 'emp-2'],
+      [CommissionType.Fixed, 10_000_000_000],
+      [CommissionType.Fixed, 99_999_999_999],
+    ])(
+      'throws BadRequestException when fixed value (%s) exceeds MAX_COMMISSION_VALUE',
+      async (commissionType, commissionValue) => {
+        const dto: UpdateCommissionRuleDto = {
+          commissionType,
+          commissionValue,
+        };
+
+        await expect(service.updateRule('emp-1', dto)).rejects.toThrow(
+          BadRequestException,
+        );
+      },
+    );
+
+    it.each([
+      ['non-existent-1', 'Funcionário não encontrado.'],
+      ['non-existent-2', 'Funcionário não encontrado.'],
     ])(
       'throws NotFoundException when employee %s is not found',
-      async (employeeId) => {
+      async (employeeId, expectedMessage) => {
         mockEmployeeRepository.findOne.mockResolvedValue(null);
 
         const dto: UpdateCommissionRuleDto = {
@@ -166,7 +183,7 @@ describe('CommissionRulesService', () => {
         };
 
         await expect(service.updateRule(employeeId, dto)).rejects.toThrow(
-          NotFoundException,
+          new NotFoundException(expectedMessage),
         );
       },
     );
@@ -196,12 +213,15 @@ describe('CommissionRulesService', () => {
       },
     );
 
-    it.each([['missing-1'], ['missing-2']])(
+    it.each([
+      ['missing-1', 'Funcionário não encontrado.'],
+      ['missing-2', 'Funcionário não encontrado.'],
+    ])(
       'throws NotFoundException when retrieving rule for missing employee %s',
-      async (employeeId) => {
+      async (employeeId, expectedMessage) => {
         mockEmployeeRepository.findOne.mockResolvedValue(null);
         await expect(service.getRule(employeeId)).rejects.toThrow(
-          NotFoundException,
+          new NotFoundException(expectedMessage),
         );
       },
     );

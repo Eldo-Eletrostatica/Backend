@@ -11,7 +11,10 @@ import {
   Employee,
 } from '../employees/entities/employee.entity';
 import { CommissionRuleResponseDto } from './dto/commission-rule-response.dto';
-import { UpdateCommissionRuleDto } from './dto/update-commission-rule.dto';
+import {
+  MAX_COMMISSION_VALUE,
+  UpdateCommissionRuleDto,
+} from './dto/update-commission-rule.dto';
 
 @Injectable()
 export class CommissionRulesService {
@@ -58,6 +61,12 @@ export class CommissionRulesService {
       if (value <= 0) {
         throw new BadRequestException(
           'O valor da comissão deve ser maior que zero.',
+        );
+      }
+
+      if (value > MAX_COMMISSION_VALUE) {
+        throw new BadRequestException(
+          'O valor da comissão não pode exceder 9.999.999.999,99.',
         );
       }
 
