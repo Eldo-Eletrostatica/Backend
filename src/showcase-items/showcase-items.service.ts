@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
@@ -12,7 +16,13 @@ import {
   ShowcaseItem,
   ShowcaseItemType,
 } from './entities/showcase-item.entity';
-import { DEFAULT_PAGE_SIZE } from './showcase-items.constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_COMPANY_EVENTS,
+} from './showcase-items.constants';
+import { CreateCompanyEventDto } from './dto/create-company-event.dto';
+import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
+import { CompanyEventResponseDto } from './dto/company-event-response.dto';
 
 @Injectable()
 export class ShowcaseItemsService {
@@ -96,6 +106,73 @@ export class ShowcaseItemsService {
   async removePortfolioProject(showcaseItemId: string): Promise<void> {
     const project = await this.findPortfolioProjectOrFail(showcaseItemId);
     await this.showcaseItemsRepository.remove(project);
+  }
+
+  // Vertical timeline of the site: newest event first.
+  async findCompanyEvents(): Promise<CompanyEventResponseDto[]> {
+    const events = await this.showcaseItemsRepository.find({
+      where: { type: ShowcaseItemType.CompanyEvent },
+      order: { eventDate: 'DESC', createdAt: 'DESC' },
+    });
+    return events.map((event) => CompanyEventResponseDto.fromEntity(event));
+  }
+
+  async findCompanyEvent(
+    showcaseItemId: string,
+  ): Promise<CompanyEventResponseDto> {
+    return CompanyEventResponseDto.fromEntity(
+      await this.findCompanyEventOrFail(showcaseItemId),
+    );
+  }
+
+  async createCompanyEvent(
+    dto: CreateCompanyEventDto,
+  ): Promise<CompanyEventResponseDto> {
+    const total = await this.showcaseItemsRepository.countBy({
+      type: ShowcaseItemType.CompanyEvent,
+    });
+    if (total >= MAX_COMPANY_EVENTS) {
+      throw new BadRequestException(
+        `O limite é de ${MAX_COMPANY_EVENTS} eventos`,
+      );
+    }
+    const event = this.showcaseItemsRepository.create({
+      ...dto,
+      type: ShowcaseItemType.CompanyEvent,
+    });
+    return CompanyEventResponseDto.fromEntity(
+      await this.showcaseItemsRepository.save(event),
+    );
+  }
+
+  async updateCompanyEvent(
+    showcaseItemId: string,
+    dto: UpdateCompanyEventDto,
+  ): Promise<CompanyEventResponseDto> {
+    const event = await this.findCompanyEventOrFail(showcaseItemId);
+    Object.assign(event, dto);
+    return CompanyEventResponseDto.fromEntity(
+      await this.showcaseItemsRepository.save(event),
+    );
+  }
+
+  async removeCompanyEvent(showcaseItemId: string): Promise<void> {
+    const event = await this.findCompanyEventOrFail(showcaseItemId);
+    await this.showcaseItemsRepository.remove(event);
+  }
+
+  // Projects share the table, so every lookup filters by the event type.
+  private async findCompanyEventOrFail(
+    showcaseItemId: string,
+  ): Promise<ShowcaseItem> {
+    const event = await this.showcaseItemsRepository.findOneBy({
+      showcaseItemId,
+      type: ShowcaseItemType.CompanyEvent,
+    });
+    if (!event) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+    return event;
   }
 
   // Events share the table, so every lookup filters by the portfolio type.

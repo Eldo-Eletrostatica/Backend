@@ -11,7 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
@@ -20,6 +20,9 @@ import {
 } from './dto/portfolio-project-response.dto';
 import { UpdatePortfolioProjectDto } from './dto/update-portfolio-project.dto';
 import { ShowcaseItemsService } from './showcase-items.service';
+import { CompanyEventResponseDto } from './dto/company-event-response.dto';
+import { CreateCompanyEventDto } from './dto/create-company-event.dto';
+import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
 
 @ApiTags('showcase-items')
 @Controller('showcase-items')
@@ -69,5 +72,41 @@ export class ShowcaseItemsController {
     @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
   ) {
     return this.showcaseItemsService.removePortfolioProject(showcaseItemId);
+  }
+
+  @Get('company-events')
+  @ApiOkResponse({ type: [CompanyEventResponseDto] })
+  findCompanyEvents() {
+    return this.showcaseItemsService.findCompanyEvents();
+  }
+
+  @Get('company-events/:showcaseItemId')
+  @ApiOkResponse({ type: CompanyEventResponseDto })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  findCompanyEvent(
+    @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
+  ) {
+    return this.showcaseItemsService.findCompanyEvent(showcaseItemId);
+  }
+
+  @Post('company-events')
+  createCompanyEvent(@Body() dto: CreateCompanyEventDto) {
+    return this.showcaseItemsService.createCompanyEvent(dto);
+  }
+
+  @Patch('company-events/:showcaseItemId')
+  updateCompanyEvent(
+    @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
+    @Body() dto: UpdateCompanyEventDto,
+  ) {
+    return this.showcaseItemsService.updateCompanyEvent(showcaseItemId, dto);
+  }
+
+  @Delete('company-events/:showcaseItemId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeCompanyEvent(
+    @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
+  ) {
+    return this.showcaseItemsService.removeCompanyEvent(showcaseItemId);
   }
 }

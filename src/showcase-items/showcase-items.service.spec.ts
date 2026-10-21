@@ -1,17 +1,23 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { ShowcaseItem } from './entities/showcase-item.entity';
 import { ShowcaseItemsService } from './showcase-items.service';
+import {
+  ShowcaseItem,
+  ShowcaseItemType,
+} from './entities/showcase-item.entity';
 
 describe('ShowcaseItemsService', () => {
   let service: ShowcaseItemsService;
+  jest.fn();
   const repository = {
+    find: jest.fn(),
     findAndCount: jest.fn(),
     findOneBy: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    countBy: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -69,6 +75,97 @@ describe('ShowcaseItemsService', () => {
       await expect(service[method]('missing-id')).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    },
+  );
+  it('lists events newest first, filtering by the event type', async () => {
+    repository.find.mockResolvedValue([]);
+
+    await service.findCompanyEvents();
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: { type: ShowcaseItemType.CompanyEvent },
+      order: { eventDate: 'DESC', createdAt: 'DESC' },
+    });
+  });
+
+  it.each([
+    { method: 'findCompanyEvent' as const },
+    { method: 'removeCompanyEvent' as const },
+  ])(
+    '$method looks only at events and throws NotFoundException',
+    async ({ method }) => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(service[method]('project-id')).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(repository.findOneBy).toHaveBeenCalledWith({
+        showcaseItemId: 'project-id',
+        type: ShowcaseItemType.CompanyEvent,
+      });
+    },
+  );
+
+  it.each([
+    { title: 'Feira Industrial', eventDate: '2026-09-12' },
+    { title: 'Visita de clientes', eventDate: '2026-03-01' },
+  ])('creates the event "$title" with the event type', async (input) => {
+    repository.countBy.mockResolvedValue(0);
+    repository.create.mockImplementation((entity: object) => entity);
+    repository.save.mockImplementation((entity: object) =>
+      Promise.resolve({
+        ...entity,
+        showcaseItemId: 'event-id',
+        createdAt: new Date(),
+      }),
+    );
+
+    const result = await service.createCompanyEvent({
+      ...input,
+      description: 'Descrição do evento',
+      imageUrl: 'https://exemplo.com/evento.jpg',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: ShowcaseItemType.CompanyEvent }),
+    );
+    expect(result.eventDate).toBe(input.eventDate);
+  });
+
+  it.each([
+    { total: 9, shouldFail: false },
+    { total: 10, shouldFail: true },
+  ])(
+    'create event with $total existing fails: $shouldFail',
+    async ({ total, shouldFail }) => {
+      repository.countBy.mockResolvedValue(total);
+      repository.create.mockImplementation((entity: object) => entity);
+      repository.save.mockImplementation((entity: object) =>
+        Promise.resolve({
+          ...entity,
+          showcaseItemId: 'event-id',
+          createdAt: new Date(),
+        }),
+      );
+      const dto = {
+        title: 'Feira',
+        description: 'Descrição',
+        imageUrl: 'https://exemplo.com/a.jpg',
+        eventDate: '2026-09-12',
+      };
+
+      let error: unknown;
+      try {
+        await service.createCompanyEvent(dto);
+      } catch (caught) {
+        error = caught;
+      }
+
+      if (shouldFail) {
+        expect(error).toBeInstanceOf(BadRequestException);
+      } else {
+        expect(error).toBeUndefined();
+      }
     },
   );
 });
