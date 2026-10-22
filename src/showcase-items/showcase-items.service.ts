@@ -1,10 +1,18 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { UploadedImageDto } from '../site-settings/dto/uploaded-image.dto';
+import {
+  detectImageFormat,
+  isUploadedImageName,
+  UNSUPPORTED_IMAGE_MESSAGE,
+} from '../site-settings/image-format';
+import { StorageService } from '../storage/storage.service';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
@@ -16,20 +24,29 @@ import {
   ShowcaseItem,
   ShowcaseItemType,
 } from './entities/showcase-item.entity';
-import {
-  DEFAULT_PAGE_SIZE,
-  MAX_COMPANY_EVENTS,
-} from './showcase-items.constants';
-import { CreateCompanyEventDto } from './dto/create-company-event.dto';
-import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
-import { CompanyEventResponseDto } from './dto/company-event-response.dto';
+import { DEFAULT_PAGE_SIZE } from './showcase-items.constants';
 
 @Injectable()
 export class ShowcaseItemsService {
+  private readonly logger = new Logger(ShowcaseItemsService.name);
+
   constructor(
     @InjectRepository(ShowcaseItem)
     private readonly showcaseItemsRepository: Repository<ShowcaseItem>,
+    private readonly storageService: StorageService,
   ) {}
+
+  async uploadShowcaseImage(content: Buffer): Promise<UploadedImageDto> {
+    const format = detectImageFormat(content);
+    if (format === null) {
+      throw new BadRequestException(UNSUPPORTED_IMAGE_MESSAGE);
+    }
+    const { url } = await this.storageService.upload(
+      { content, ...format },
+      SHOWCASE_IMAGES_FOLDER,
+    );
+    return { url };
+  }
 
   async findPortfolioProjects(
     query: ListPortfolioProjectsQueryDto,
@@ -83,6 +100,7 @@ export class ShowcaseItemsService {
   async createPortfolioProject(
     dto: CreatePortfolioProjectDto,
   ): Promise<PortfolioProjectResponseDto> {
+    this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
     const project = this.showcaseItemsRepository.create({
       ...dto,
       type: ShowcaseItemType.PortfolioProject,
@@ -96,16 +114,67 @@ export class ShowcaseItemsService {
     showcaseItemId: string,
     dto: UpdatePortfolioProjectDto,
   ): Promise<PortfolioProjectResponseDto> {
+    this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
     const project = await this.findPortfolioProjectOrFail(showcaseItemId);
+    const previousUrls = [
+      project.imageUrl,
+      project.beforeUrl,
+      project.afterUrl,
+    ];
+
     Object.assign(project, dto);
-    return PortfolioProjectResponseDto.fromEntity(
-      await this.showcaseItemsRepository.save(project),
+    const saved = await this.showcaseItemsRepository.save(project);
+
+    // Pictures that were replaced or removed are deleted only after the save.
+    const currentUrls = [saved.imageUrl, saved.beforeUrl, saved.afterUrl];
+    await this.deleteImages(
+      previousUrls.filter((url) => !currentUrls.includes(url)),
     );
+    return PortfolioProjectResponseDto.fromEntity(saved);
   }
 
   async removePortfolioProject(showcaseItemId: string): Promise<void> {
     const project = await this.findPortfolioProjectOrFail(showcaseItemId);
+    const urls = [project.imageUrl, project.beforeUrl, project.afterUrl];
     await this.showcaseItemsRepository.remove(project);
+    await this.deleteImages(urls);
+  }
+
+  // Only images sent through the upload route are accepted, so every picture
+  // of the showcase lives in the bucket.
+  private assertImagesFromUpload(urls: Array<string | null | undefined>): void {
+    const folderUrl = `${this.storageService.publicUrl}/${SHOWCASE_IMAGES_FOLDER}/`;
+    const isUploadedImageUrl = (url: string) =>
+      url.startsWith(folderUrl) &&
+      isUploadedImageName(url.slice(folderUrl.length));
+    const hasForeignImage = urls.some(
+      (url) => typeof url === 'string' && !isUploadedImageUrl(url),
+    );
+    if (hasForeignImage) {
+      throw new BadRequestException(
+        'Envie a imagem pela rota de upload e use a URL devolvida.',
+      );
+    }
+  }
+
+  // The data is already saved when this runs, so a bucket failure is only
+  // logged: it must not turn a successful request into a 500.
+  private async deleteImages(
+    urls: Array<string | null | undefined>,
+  ): Promise<void> {
+    const prefix = `${this.storageService.publicUrl}/`;
+    const keys = urls
+      .filter((url): url is string => typeof url === 'string')
+      .filter((url) => url.startsWith(prefix))
+      .map((url) => url.slice(prefix.length));
+    if (keys.length === 0) {
+      return;
+    }
+    try {
+      await this.storageService.deleteMany(keys);
+    } catch (error) {
+      this.logger.error('Falha ao apagar imagens da vitrine do bucket', error);
+    }
   }
 
   // Vertical timeline of the site: newest event first.

@@ -13,6 +13,7 @@ import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
 } from '../showcase-items.constants';
+import { TrimString } from './trim-string.transform';
 
 export class ListPortfolioProjectsQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -32,6 +33,7 @@ export class ListPortfolioProjectsQueryDto {
 
   @ApiPropertyOptional({ example: 'Estrutura Metálica' })
   @IsOptional()
+  @TrimString()
   @IsString()
   @MaxLength(CATEGORY_MAX_LENGTH)
   category?: string;

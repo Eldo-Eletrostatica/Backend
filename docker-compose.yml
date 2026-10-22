@@ -31,12 +31,13 @@ services:
       timeout: 5s
       retries: 10
 
-  # Creates the bucket once the storage is up; exits when done.
+  # Creates the buckets once the storage is up and exits: eldo for development
+  # and eldo-test for the integration tests, which delete what they upload.
   seaweedfs-setup:
     image: chrislusf/seaweedfs:4.48
     entrypoint: ['/bin/sh', '-c']
     command:
-      - echo 's3.bucket.create -name eldo' | weed shell -master=seaweedfs:9333 || true
+      - printf 's3.bucket.create -name eldo\ns3.bucket.create -name eldo-test\n' | weed shell -master=seaweedfs:9333 || true
     depends_on:
       seaweedfs:
         condition: service_healthy

@@ -1,17 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-} from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import {
   CATEGORY_MAX_LENGTH,
   MATERIALS_MAX_LENGTH,
   SERVICE_TYPE_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../showcase-items.constants';
+import { TrimString } from './trim-string.transform';
 
 export class CreatePortfolioProjectDto {
   @ApiProperty({ maxLength: TITLE_MAX_LENGTH })
@@ -25,13 +20,13 @@ export class CreatePortfolioProjectDto {
   @IsNotEmpty()
   description: string;
 
-  // Cover image. The storage service is still undecided, so only the URL is received.
   @ApiProperty()
-  @IsUrl()
+  @IsString()
+  @IsNotEmpty()
   imageUrl: string;
 
   @ApiProperty({ maxLength: CATEGORY_MAX_LENGTH })
-  @IsString()
+  @TrimString()
   @IsNotEmpty()
   @MaxLength(CATEGORY_MAX_LENGTH)
   category: string;
@@ -50,11 +45,11 @@ export class CreatePortfolioProjectDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsString()
   beforeUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsString()
   afterUrl?: string;
 }

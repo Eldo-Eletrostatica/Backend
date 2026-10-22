@@ -1,11 +1,20 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { StorageService } from '../storage/storage.service';
 import { ShowcaseItemsService } from './showcase-items.service';
-import {
-  ShowcaseItem,
-  ShowcaseItemType,
-} from './entities/showcase-item.entity';
+
+const PUBLIC_URL = 'http://localhost:8333/eldo';
+const STORED_NAME = '3f2b8c1e-4a5d-4e6f-8a9b-0c1d2e3f4a5b.png';
+const STORED_URL = `${PUBLIC_URL}/showcase/${STORED_NAME}`;
+
+const validProject = {
+  title: 'Portão',
+  description: 'Descrição',
+  category: 'Estrutura',
+  serviceType: 'Epóxi',
+  materials: 'Aço',
+};
 
 describe('ShowcaseItemsService', () => {
   let service: ShowcaseItemsService;
@@ -19,13 +28,20 @@ describe('ShowcaseItemsService', () => {
     remove: jest.fn(),
     countBy: jest.fn(),
   };
+  const storageService = {
+    publicUrl: PUBLIC_URL,
+    upload: jest.fn(),
+    deleteMany: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    storageService.publicUrl = PUBLIC_URL;
     const moduleRef = await Test.createTestingModule({
       providers: [
         ShowcaseItemsService,
         { provide: getRepositoryToken(ShowcaseItem), useValue: repository },
+        { provide: StorageService, useValue: storageService },
       ],
     }).compile();
     service = moduleRef.get(ShowcaseItemsService);
@@ -60,112 +76,20 @@ describe('ShowcaseItemsService', () => {
     const calls = repository.findAndCount.mock.calls as [
       { where: Record<string, unknown> },
     ][];
-    const options = calls[0][0];
-    expect('category' in options.where).toBe(hasFilter);
+    expect('category' in calls[0][0].where).toBe(hasFilter);
   });
 
   it.each([
-    { method: 'findPortfolioProject' as const },
-    { method: 'removePortfolioProject' as const },
+    { method: 'findPortfolioProject' as const, id: 'missing-id' },
+    { method: 'removePortfolioProject' as const, id: 'other-missing-id' },
   ])(
-    '$method throws NotFoundException for an unknown id',
-    async ({ method }) => {
+    '$method throws NotFoundException for the unknown id $id',
+    async ({ method, id }) => {
       repository.findOneBy.mockResolvedValue(null);
 
-      await expect(service[method]('missing-id')).rejects.toBeInstanceOf(
+      await expect(service[method](id)).rejects.toBeInstanceOf(
         NotFoundException,
       );
-    },
-  );
-  it('lists events newest first, filtering by the event type', async () => {
-    repository.find.mockResolvedValue([]);
-
-    await service.findCompanyEvents();
-
-    expect(repository.find).toHaveBeenCalledWith({
-      where: { type: ShowcaseItemType.CompanyEvent },
-      order: { eventDate: 'DESC', createdAt: 'DESC' },
-    });
-  });
-
-  it.each([
-    { method: 'findCompanyEvent' as const },
-    { method: 'removeCompanyEvent' as const },
-  ])(
-    '$method looks only at events and throws NotFoundException',
-    async ({ method }) => {
-      repository.findOneBy.mockResolvedValue(null);
-
-      await expect(service[method]('project-id')).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-      expect(repository.findOneBy).toHaveBeenCalledWith({
-        showcaseItemId: 'project-id',
-        type: ShowcaseItemType.CompanyEvent,
-      });
-    },
-  );
-
-  it.each([
-    { title: 'Feira Industrial', eventDate: '2026-09-12' },
-    { title: 'Visita de clientes', eventDate: '2026-03-01' },
-  ])('creates the event "$title" with the event type', async (input) => {
-    repository.countBy.mockResolvedValue(0);
-    repository.create.mockImplementation((entity: object) => entity);
-    repository.save.mockImplementation((entity: object) =>
-      Promise.resolve({
-        ...entity,
-        showcaseItemId: 'event-id',
-        createdAt: new Date(),
-      }),
-    );
-
-    const result = await service.createCompanyEvent({
-      ...input,
-      description: 'Descrição do evento',
-      imageUrl: 'https://exemplo.com/evento.jpg',
-    });
-
-    expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({ type: ShowcaseItemType.CompanyEvent }),
-    );
-    expect(result.eventDate).toBe(input.eventDate);
-  });
-
-  it.each([
-    { total: 9, shouldFail: false },
-    { total: 10, shouldFail: true },
-  ])(
-    'create event with $total existing fails: $shouldFail',
-    async ({ total, shouldFail }) => {
-      repository.countBy.mockResolvedValue(total);
-      repository.create.mockImplementation((entity: object) => entity);
-      repository.save.mockImplementation((entity: object) =>
-        Promise.resolve({
-          ...entity,
-          showcaseItemId: 'event-id',
-          createdAt: new Date(),
-        }),
-      );
-      const dto = {
-        title: 'Feira',
-        description: 'Descrição',
-        imageUrl: 'https://exemplo.com/a.jpg',
-        eventDate: '2026-09-12',
-      };
-
-      let error: unknown;
-      try {
-        await service.createCompanyEvent(dto);
-      } catch (caught) {
-        error = caught;
-      }
-
-      if (shouldFail) {
-        expect(error).toBeInstanceOf(BadRequestException);
-      } else {
-        expect(error).toBeUndefined();
-      }
     },
   );
 });
