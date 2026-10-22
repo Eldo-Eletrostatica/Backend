@@ -93,4 +93,23 @@ export class SiteSettingsController {
   publishVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.publishVisualSettings();
   }
+
+  @Post('visual/draft/discard')
+  @ApiOperation({
+    summary: 'Descarta o rascunho: ele volta a ser igual à versão publicada',
+  })
+  @ApiCreatedResponse()
+  discardVisualDraft(): Promise<VisualSettings> {
+    return this.siteSettingsService.discardVisualDraft();
+  }
+
+  @Post('visual/restore-default')
+  @ApiOperation({
+    summary:
+      'Restaura a identidade visual padrão no site e no rascunho, na hora',
+  })
+  @ApiCreatedResponse()
+  restoreDefaultVisualSettings(): Promise<VisualSettings> {
+    return this.siteSettingsService.restoreDefaultVisualSettings();
+  }
 }

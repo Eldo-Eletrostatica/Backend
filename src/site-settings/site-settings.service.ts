@@ -16,6 +16,7 @@ import { SiteSetting } from './entities/site-setting.entity';
 import {
   applyVisualSettingsPatch,
   DEFAULT_VISUAL_SETTINGS,
+  imageUrlsOf,
   VisualSettings,
   VisualSettingsPatch,
 } from './visual-settings';
@@ -46,8 +47,7 @@ export class SiteSettingsService {
   }
 
   async getPublishedVisualSettings(): Promise<VisualSettings> {
-    const settings = await this.findSettings();
-    return settings.visualPublished ?? DEFAULT_VISUAL_SETTINGS;
+    return this.publishedOf(await this.findSettings());
   }
 
   async getDraftVisualSettings(): Promise<VisualSettings> {
@@ -68,24 +68,54 @@ export class SiteSettingsService {
   }
 
   async publishVisualSettings(): Promise<VisualSettings> {
-    const draft = await this.updateLockedSettings((settings) => {
+    return this.updateLockedSettingsAndDeleteUnusedImages((settings) => {
       const currentDraft = this.draftOf(settings);
       settings.visualDraft = currentDraft;
       settings.visualPublished = currentDraft;
       return currentDraft;
     });
-    // Draft and published are the same right after publishing, so the draft
-    // holds every image still in use. The site already shows the new settings;
-    // an image left behind by a failure is deleted on the next publish.
+  }
+
+  // A null draft starts again as a copy of the published settings.
+  async discardVisualDraft(): Promise<VisualSettings> {
+    return this.updateLockedSettingsAndDeleteUnusedImages((settings) => {
+      settings.visualDraft = null;
+      return this.draftOf(settings);
+    });
+  }
+
+  // Null in both columns means the default defined in code, so a later change
+  // of the default also reaches a restored site.
+  async restoreDefaultVisualSettings(): Promise<VisualSettings> {
+    return this.updateLockedSettingsAndDeleteUnusedImages((settings) => {
+      settings.visualPublished = null;
+      settings.visualDraft = null;
+      return this.publishedOf(settings);
+    });
+  }
+
+  // The images in use come from the saved row, published and draft, so every
+  // action keeps exactly what the site and the editor still show. The new
+  // settings are already saved when the cleanup runs; an image left behind by
+  // a bucket failure is deleted by the next action that cleans the folder.
+  private async updateLockedSettingsAndDeleteUnusedImages<Result>(
+    change: (settings: SiteSetting) => Result,
+  ): Promise<Result> {
+    let usedUrls: (string | null)[] = [];
+    const result = await this.updateLockedSettings((settings) => {
+      const changeResult = change(settings);
+      usedUrls = [
+        ...imageUrlsOf(this.publishedOf(settings)),
+        ...imageUrlsOf(this.draftOf(settings)),
+      ];
+      return changeResult;
+    });
     await this.storageService
-      .deleteUnusedImages(VISUAL_IMAGES_FOLDER, [
-        draft.logo.imageUrl,
-        draft.banner.imageUrl,
-      ])
+      .deleteUnusedImages(VISUAL_IMAGES_FOLDER, usedUrls)
       .catch((error: unknown) =>
         this.logger.error('Falha ao apagar imagens sem uso do bucket', error),
       );
-    return draft;
+    return result;
   }
 
   // Only images sent through the upload route are accepted, so the cleanup on
@@ -104,13 +134,13 @@ export class SiteSettingsService {
     }
   }
 
+  private publishedOf(settings: SiteSetting): VisualSettings {
+    return settings.visualPublished ?? DEFAULT_VISUAL_SETTINGS;
+  }
+
   // Until the first edit there is no draft: it starts as the published settings.
   private draftOf(settings: SiteSetting): VisualSettings {
-    return (
-      settings.visualDraft ??
-      settings.visualPublished ??
-      DEFAULT_VISUAL_SETTINGS
-    );
+    return settings.visualDraft ?? this.publishedOf(settings);
   }
 
   // site_settings holds a single row, created by the SeedSiteSettings migration.
