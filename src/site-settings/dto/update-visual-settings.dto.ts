@@ -5,9 +5,9 @@ import {
   IsString,
   Matches,
   MaxLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { IsOmittable } from '../../common/is-omittable';
 import {
   DESCRIPTION_MAX_LENGTH,
   EYEBROW_MAX_LENGTH,
@@ -18,10 +18,8 @@ import {
   VisualSettingsPatch,
 } from '../visual-settings';
 
-// @IsOptional also lets null through; text and colors may be left out of the
-// PATCH but never cleared, only the images accept null.
-const IsOmittable = () =>
-  ValidateIf((_patch: object, value: unknown) => value !== undefined);
+// Text and colors may be left out of the PATCH but never cleared; only the
+// images accept null.
 
 const HEX_COLOR_MESSAGE = '$property must be a hex color such as #e9b421';
 

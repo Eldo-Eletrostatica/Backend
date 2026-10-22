@@ -20,8 +20,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
-import { UploadedImageDto } from './dto/uploaded-image.dto';
-import { MAX_IMAGE_BYTES } from './image-format';
+import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
+import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { SiteSettingsService } from './site-settings.service';
 import { VisualSettings } from './visual-settings';
 

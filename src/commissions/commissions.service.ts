@@ -1,17 +1,45 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
-import { Employee } from '../employees/entities/employee.entity';
-import { Order, SALE_STATUSES } from '../orders/entities/order.entity';
-import { endOfBrasiliaDay, startOfBrasiliaDay } from './brasilia-day';
+import { Repository } from 'typeorm';
+import { toBrasiliaPeriod } from '../common/brasilia-day';
+import { formatMoney, toCsv } from '../common/csv';
+import { PeriodQueryDto } from '../common/dto/period-query.dto';
+import {
+  findSalesInPeriod,
+  groupSalesBySeller,
+  sumSales,
+} from '../common/sales-in-period';
+import {
+  CommissionType,
+  Employee,
+} from '../employees/entities/employee.entity';
+import { Order } from '../orders/entities/order.entity';
 import { AccumulatedCommissionsResponseDto } from './dto/accumulated-commissions-response.dto';
-import { GetCommissionsQueryDto } from './dto/get-commissions-query.dto';
+import {
+  CommissionReportEmployeeDto,
+  CommissionReportResponseDto,
+} from './dto/commission-report-response.dto';
 
-const CENTS_PER_REAL = 100;
+const COMMISSION_REPORT_HEADERS = [
+  'Nome do Funcionário',
+  'E-mail',
+  'Total de Vendas',
+  'Valor Total Vendido (R$)',
+  'Total de Comissão (R$)',
+  'Regra de Comissão Atual',
+];
+
+// The current rule, not the one used by each sale: the commission of a sale
+// is frozen at launch (ADR 0003).
+function formatCurrentCommissionRule(employee: CommissionReportEmployeeDto) {
+  const { commissionType, commissionValue } = employee;
+  if (commissionType === null || commissionValue === null) {
+    return '-';
+  }
+  return commissionType === CommissionType.Percentage
+    ? `${formatMoney(commissionValue)}%`
+    : `R$ ${formatMoney(commissionValue)}`;
+}
 
 @Injectable()
 export class CommissionsService {
@@ -24,18 +52,11 @@ export class CommissionsService {
 
   async getAccumulatedCommissions(
     employeeId: string,
-    query: GetCommissionsQueryDto,
+    query: PeriodQueryDto,
   ): Promise<AccumulatedCommissionsResponseDto> {
     const { startDate, endDate } = query;
+    const period = toBrasiliaPeriod(startDate, endDate);
 
-    const startDateTime = startOfBrasiliaDay(startDate);
-    const endDateTime = endOfBrasiliaDay(endDate);
-
-    if (startDateTime > endDateTime) {
-      throw new BadRequestException(
-        'A data inicial não pode ser posterior à data final.',
-      );
-    }
     const employee = await this.employeeRepository.findOne({
       where: { employeeId },
     });
@@ -43,45 +64,87 @@ export class CommissionsService {
       throw new NotFoundException('Vendedor não encontrado.');
     }
 
-    const orders = await this.orderRepository.find({
-      where: {
-        sellerEmployeeId: employeeId,
-        status: In(SALE_STATUSES),
-        soldAt: Between(startDateTime, endDateTime),
-      },
-      order: {
-        soldAt: 'ASC',
-      },
-    });
-
-    let totalCommissionCents = 0;
-    let totalSalesValueCents = 0;
-
-    const sales = orders.map((order) => {
-      const commission = order.commission ?? 0;
-      const finalPrice = order.finalPrice ?? 0;
-
-      totalCommissionCents += Math.round(commission * CENTS_PER_REAL);
-      totalSalesValueCents += Math.round(finalPrice * CENTS_PER_REAL);
-
-      return {
-        orderId: order.orderId,
-        trackingCode: order.trackingCode ?? '',
-        soldAt: order.soldAt!,
-        finalPrice,
-        commission,
-        status: order.status,
-      };
-    });
+    const orders = await findSalesInPeriod(
+      this.orderRepository,
+      period,
+      employeeId,
+    );
+    const { salesCount, totalSalesValue, totalCommission } = sumSales(orders);
 
     return {
       employeeId,
       startDate,
       endDate,
-      totalCommission: totalCommissionCents / CENTS_PER_REAL,
-      totalSalesValue: totalSalesValueCents / CENTS_PER_REAL,
-      salesCount: orders.length,
-      sales,
+      totalCommission,
+      totalSalesValue,
+      salesCount,
+      sales: orders.map((order) => ({
+        orderId: order.orderId,
+        trackingCode: order.trackingCode ?? '',
+        soldAt: order.soldAt!,
+        finalPrice: order.finalPrice ?? 0,
+        commission: order.commission ?? 0,
+        status: order.status,
+      })),
     };
+  }
+
+  // Lists every active employee with a commission rule, even without sales,
+  // plus removed employees who still sold in the period.
+  async getCommissionReport(
+    query: PeriodQueryDto,
+  ): Promise<CommissionReportResponseDto> {
+    const { startDate, endDate } = query;
+    const period = toBrasiliaPeriod(startDate, endDate);
+
+    const sales = await findSalesInPeriod(this.orderRepository, period);
+    const salesBySeller = groupSalesBySeller(sales);
+    const allEmployees = await this.employeeRepository.find({
+      withDeleted: true,
+    });
+
+    const employees = allEmployees
+      .filter(
+        (employee) =>
+          (employee.deletedAt === null && employee.commissionType !== null) ||
+          salesBySeller.has(employee.employeeId),
+      )
+      .map((employee) => ({
+        employeeId: employee.employeeId,
+        name: employee.name,
+        email: employee.email,
+        ...sumSales(salesBySeller.get(employee.employeeId) ?? []),
+        commissionType: employee.commissionType,
+        commissionValue: employee.commissionValue,
+        isDeleted: employee.deletedAt !== null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const totals = sumSales(sales);
+    return {
+      period: { startDate, endDate },
+      summary: {
+        totalCommission: totals.totalCommission,
+        totalSalesValue: totals.totalSalesValue,
+        totalSalesCount: totals.salesCount,
+        sellersCount: employees.length,
+      },
+      employees,
+    };
+  }
+
+  async exportCommissionReportCsv(query: PeriodQueryDto): Promise<string> {
+    const report = await this.getCommissionReport(query);
+    return toCsv(
+      COMMISSION_REPORT_HEADERS,
+      report.employees.map((employee) => [
+        employee.name,
+        employee.email,
+        employee.salesCount,
+        formatMoney(employee.totalSalesValue),
+        formatMoney(employee.totalCommission),
+        formatCurrentCommissionRule(employee),
+      ]),
+    );
   }
 }

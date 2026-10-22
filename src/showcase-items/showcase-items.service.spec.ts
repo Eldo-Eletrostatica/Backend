@@ -33,14 +33,15 @@ describe('ShowcaseItemsService', () => {
     findAndCount: jest.fn(),
     findOneBy: jest.fn(),
     countBy: jest.fn(),
+    find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
   };
   const storageService = {
-    publicUrl: PUBLIC_URL,
     upload: jest.fn(),
-    deleteMany: jest.fn(),
+    isUploadedImageUrl: jest.fn(),
+    deleteUnusedImages: jest.fn(),
   };
 
   const mockSaveEchoingEntity = () => {
@@ -56,7 +57,6 @@ describe('ShowcaseItemsService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
-    storageService.publicUrl = PUBLIC_URL;
     const moduleRef = await Test.createTestingModule({
       providers: [
         ShowcaseItemsService,
@@ -113,6 +113,7 @@ describe('ShowcaseItemsService', () => {
         );
       },
     );
+    repository.find.mockResolvedValue([]);
 
     it.each([
       { origin: 'another site', url: 'https://exemplo.com/capa.jpg' },
@@ -137,11 +138,26 @@ describe('ShowcaseItemsService', () => {
     ])('accepts the $label from the bucket', async ({ photo }) => {
       mockSaveEchoingEntity();
 
-      const result = await service.createPortfolioProject({
-        ...validProject,
-        imageUrl: STORED_URL,
-        [photo]: STORED_URL,
-      });
+  it.each([
+    {
+      case: 'the pictures of the remaining items',
+      remainingItems: [
+        { imageUrl: STORED_URL, beforeUrl: null, afterUrl: null },
+      ],
+      expectedUsedUrls: [STORED_URL, null, null],
+    },
+    {
+      case: 'no picture when the table is empty',
+      remainingItems: [],
+      expectedUsedUrls: [],
+    },
+  ])(
+    'keeps in the bucket $case after a removal',
+    async ({ remainingItems, expectedUsedUrls }) => {
+      repository.findOneBy.mockResolvedValue({ showcaseItemId: 'project-id' });
+      repository.remove.mockResolvedValue(undefined);
+      repository.find.mockResolvedValue(remainingItems);
+      storageService.deleteUnusedImages.mockResolvedValue(undefined);
 
       expect(result[photo]).toBe(STORED_URL);
     });

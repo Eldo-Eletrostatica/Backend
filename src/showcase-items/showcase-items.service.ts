@@ -6,12 +6,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UploadedImageDto } from '../site-settings/dto/uploaded-image.dto';
+import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import {
   detectImageFormat,
-  isUploadedImageName,
   UNSUPPORTED_IMAGE_MESSAGE,
-} from '../site-settings/image-format';
+} from '../storage/image-format';
 import { StorageService } from '../storage/storage.service';
 import { CompanyEventResponseDto } from './dto/company-event-response.dto';
 import { CreateCompanyEventDto } from './dto/create-company-event.dto';
@@ -111,13 +110,14 @@ export class ShowcaseItemsService {
     dto: CreatePortfolioProjectDto,
   ): Promise<PortfolioProjectResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
-    const project = this.showcaseItemsRepository.create({
-      ...dto,
-      type: ShowcaseItemType.PortfolioProject,
-    });
-    return PortfolioProjectResponseDto.fromEntity(
-      await this.showcaseItemsRepository.save(project),
+    const project = await this.showcaseItemsRepository.save(
+      this.showcaseItemsRepository.create({
+        ...dto,
+        type: ShowcaseItemType.PortfolioProject,
+      }),
     );
+    await this.deleteUnusedImages();
+    return PortfolioProjectResponseDto.fromEntity(project);
   }
 
   async updatePortfolioProject(
@@ -126,28 +126,16 @@ export class ShowcaseItemsService {
   ): Promise<PortfolioProjectResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
     const project = await this.findPortfolioProjectOrFail(showcaseItemId);
-    const previousUrls = [
-      project.imageUrl,
-      project.beforeUrl,
-      project.afterUrl,
-    ];
-
     Object.assign(project, dto);
     const saved = await this.showcaseItemsRepository.save(project);
-
-    // Pictures that were replaced or removed are deleted only after the save.
-    const currentUrls = [saved.imageUrl, saved.beforeUrl, saved.afterUrl];
-    await this.deleteImages(
-      previousUrls.filter((url) => !currentUrls.includes(url)),
-    );
+    await this.deleteUnusedImages();
     return PortfolioProjectResponseDto.fromEntity(saved);
   }
 
   async removePortfolioProject(showcaseItemId: string): Promise<void> {
     const project = await this.findPortfolioProjectOrFail(showcaseItemId);
-    const urls = [project.imageUrl, project.beforeUrl, project.afterUrl];
     await this.showcaseItemsRepository.remove(project);
-    await this.deleteImages(urls);
+    await this.deleteUnusedImages();
   }
 
   // ---- Company events ----
@@ -223,12 +211,10 @@ export class ShowcaseItemsService {
   // Only images sent through the upload route are accepted, so every picture
   // of the showcase lives in the bucket.
   private assertImagesFromUpload(urls: Array<string | null | undefined>): void {
-    const folderUrl = `${this.storageService.publicUrl}/${SHOWCASE_IMAGES_FOLDER}/`;
-    const isUploadedImageUrl = (url: string) =>
-      url.startsWith(folderUrl) &&
-      isUploadedImageName(url.slice(folderUrl.length));
     const hasForeignImage = urls.some(
-      (url) => typeof url === 'string' && !isUploadedImageUrl(url),
+      (url) =>
+        typeof url === 'string' &&
+        !this.storageService.isUploadedImageUrl(url, SHOWCASE_IMAGES_FOLDER),
     );
     if (hasForeignImage) {
       throw new BadRequestException(
@@ -237,21 +223,19 @@ export class ShowcaseItemsService {
     }
   }
 
-  // The data is already saved when this runs, so a bucket failure is only
-  // logged: it must not turn a successful request into a 500.
-  private async deleteImages(
-    urls: Array<string | null | undefined>,
-  ): Promise<void> {
-    const prefix = `${this.storageService.publicUrl}/`;
-    const keys = urls
-      .filter((url): url is string => typeof url === 'string')
-      .filter((url) => url.startsWith(prefix))
-      .map((url) => url.slice(prefix.length));
-    if (keys.length === 0) {
-      return;
-    }
+  // Runs after every change, over all the items of the table: it deletes
+  // replaced pictures and uploads never saved, but keeps a picture that
+  // another item, project or event, still uses. The data is already saved
+  // when this runs, so a bucket failure is only logged.
+  private async deleteUnusedImages(): Promise<void> {
     try {
-      await this.storageService.deleteMany(keys);
+      const items = await this.showcaseItemsRepository.find({
+        select: { imageUrl: true, beforeUrl: true, afterUrl: true },
+      });
+      await this.storageService.deleteUnusedImages(
+        SHOWCASE_IMAGES_FOLDER,
+        items.flatMap((item) => [item.imageUrl, item.beforeUrl, item.afterUrl]),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 

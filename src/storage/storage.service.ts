@@ -5,8 +5,10 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isUploadedImageName } from './image-format';
+import { findUnusedImageKeys } from './unused-images';
 
 export interface FileToStore {
   content: Buffer;
@@ -28,6 +30,12 @@ export interface ListedFile {
 // The S3 API deletes at most 1000 objects per request.
 const MAX_KEYS_PER_DELETE = 1000;
 
+// How long an unused upload survives a cleanup, in case its URL is still on
+// the way to the record that uses it. A provider, so the integration tests can
+// set it to 0.
+export const IMAGE_CLEANUP_GRACE_PERIOD_MS = 'IMAGE_CLEANUP_GRACE_PERIOD_MS';
+export const DEFAULT_IMAGE_CLEANUP_GRACE_PERIOD_MS = 60 * 60 * 1000;
+
 // The S3 API is the same on SeaweedFS (development) and Cloudflare R2
 // (production); only the S3_* variables change (ADR 0006).
 @Injectable()
@@ -36,7 +44,11 @@ export class StorageService {
   private readonly bucket: string;
   readonly publicUrl: string;
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    @Inject(IMAGE_CLEANUP_GRACE_PERIOD_MS)
+    private readonly imageCleanupGracePeriodMs: number,
+  ) {
     this.bucket = config.getOrThrow<string>('S3_BUCKET');
     this.publicUrl = config.getOrThrow<string>('S3_PUBLIC_URL');
     this.client = new S3Client({
@@ -97,5 +109,30 @@ export class StorageService {
         }),
       );
     }
+  }
+
+  // Features accept only images sent through their upload route, so the
+  // cleanup below knows every image in the folder that is in use.
+  isUploadedImageUrl(url: string, folder: string): boolean {
+    const folderUrl = `${this.publicUrl}/${folder}/`;
+    return (
+      url.startsWith(folderUrl) &&
+      isUploadedImageName(url.slice(folderUrl.length))
+    );
+  }
+
+  // Deletes the images of the folder that no record points to anymore.
+  async deleteUnusedImages(
+    folder: string,
+    usedUrls: (string | null)[],
+  ): Promise<void> {
+    const unusedKeys = findUnusedImageKeys(
+      await this.listFiles(folder),
+      usedUrls,
+      this.publicUrl,
+      new Date(),
+      this.imageCleanupGracePeriodMs,
+    );
+    await this.deleteMany(unusedKeys);
   }
 }

@@ -6,7 +6,7 @@ const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 // days that do not exist, such as 2026-02-30.
 const STRICT_DATE = { strict: true };
 
-export class GetCommissionsQueryDto {
+export class PeriodQueryDto {
   @ApiProperty({
     example: '2026-10-01',
     description: 'Data inicial do período no formato YYYY-MM-DD',
