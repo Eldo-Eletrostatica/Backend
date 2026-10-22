@@ -64,6 +64,8 @@ export class CommissionReportEmployeeDto {
     enum: CommissionType,
     nullable: true,
     example: CommissionType.Percentage,
+    description:
+      'Tipo da regra de comissão atual; as comissões do período foram calculadas com a regra vigente em cada venda',
   })
   commissionType: CommissionType | null;
 
@@ -71,7 +73,7 @@ export class CommissionReportEmployeeDto {
     type: 'number',
     nullable: true,
     example: 3.0,
-    description: 'Percentual ou valor fixo em R$ da regra de comissão',
+    description: 'Percentual ou valor fixo em R$ da regra de comissão atual',
   })
   commissionValue: number | null;
 

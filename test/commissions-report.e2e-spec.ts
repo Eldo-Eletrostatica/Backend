@@ -1,12 +1,12 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { CommissionReportResponseDto } from '../src/commissions/dto/commission-report-response.dto';
-import { SalesRankingResponseDto } from '../src/commissions/dto/sales-ranking-response.dto';
+import { SalesRankingResponseDto } from '../src/sales-rankings/dto/sales-ranking-response.dto';
 import {
   CommissionType,
   EmployeeRole,
@@ -27,12 +27,6 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
       imports: [AppModule],
     }).compile();
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-      }),
-    );
     await app.init();
     dataSource = app.get(DataSource);
   });
@@ -147,7 +141,6 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         50,
       );
 
-      // Bernardo tem 2 vendas no período
       await insertSoldOrder(
         emp1,
         1000,
@@ -161,7 +154,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         new Date('2026-10-15T12:00:00.000Z'),
       );
 
-      // Aline não tem vendas no período (deve vir zerada)
+      // An active seller without sales still appears, with zeroed totals.
 
       const res = await request(app.getHttpServer())
         .get('/commissions/report')
@@ -194,7 +187,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
       const empA = await createTestEmployee('Vendedor A');
       const empB = await createTestEmployee('Vendedor B');
 
-      // Vendedor A: 1 venda de 5000 (maior valor)
+      // A sells more in value; B sells more in volume.
       await insertSoldOrder(
         empA,
         5000,
@@ -202,7 +195,6 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         new Date('2026-10-10T12:00:00.000Z'),
       );
 
-      // Vendedor B: 3 vendas de 1000 (total 3000, maior volume)
       await insertSoldOrder(
         empB,
         1000,
@@ -222,9 +214,8 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         new Date('2026-10-13T12:00:00.000Z'),
       );
 
-      // 1. Ordenação padrão por valor (orderBy=value)
       const resValue = await request(app.getHttpServer())
-        .get('/commissions/ranking')
+        .get('/sales-rankings')
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -239,9 +230,8 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
       expect(rankB!.totalSalesValue).toBe(3000);
       expect(rankB!.averageTicket).toBe(1000);
 
-      // 2. Ordenação por volume (orderBy=volume)
       const resVolume = await request(app.getHttpServer())
-        .get('/commissions/ranking')
+        .get('/sales-rankings')
         .query({
           startDate: '2026-10-01',
           endDate: '2026-10-31',
@@ -266,7 +256,6 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         new Date('2026-10-08T12:00:00.000Z'),
       );
 
-      // 1. Exportação do relatório de comissão
       const resReport = await request(app.getHttpServer())
         .get('/commissions/report/export')
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
@@ -282,9 +271,8 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
       );
       expect(resReport.text).toContain('Vendedor Exportação');
 
-      // 2. Exportação do ranking de vendas
       const resRanking = await request(app.getHttpServer())
-        .get('/commissions/ranking/export')
+        .get('/sales-rankings/export')
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -308,9 +296,9 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         'formato inválido',
         { startDate: '01/10/2026', endDate: '2026-10-31' },
       ],
-      ['/commissions/ranking', 'sem datas', {}],
+      ['/sales-rankings', 'sem datas', {}],
       [
-        '/commissions/ranking',
+        '/sales-rankings',
         'orderBy inválido',
         { startDate: '2026-10-01', endDate: '2026-10-31', orderBy: 'invalido' },
       ],
@@ -320,7 +308,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
         { startDate: '2026-10-31', endDate: '2026-10-01' },
       ],
       [
-        '/commissions/ranking/export',
+        '/sales-rankings/export',
         'data inexistente',
         { startDate: '2026-02-30', endDate: '2026-03-31' },
       ],

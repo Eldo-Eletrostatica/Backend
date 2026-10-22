@@ -161,4 +161,3 @@ _Avoid_: leaderboard, sales contest
 **ReportExport** (exportação de relatório):
 Arquivo gerado no formato de planilha a partir dos dados do relatório ou do ranking exibidos na tela, para download imediato.
 _Avoid_: report download, data dump
-

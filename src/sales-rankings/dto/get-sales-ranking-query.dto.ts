@@ -1,13 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional } from 'class-validator';
-import { GetCommissionsQueryDto } from './get-commissions-query.dto';
+import { PeriodQueryDto } from '../../common/dto/period-query.dto';
 
 export enum SalesRankingOrderBy {
   Value = 'value',
   Volume = 'volume',
 }
 
-export class GetSalesRankingQueryDto extends GetCommissionsQueryDto {
+export class GetSalesRankingQueryDto extends PeriodQueryDto {
   @ApiPropertyOptional({
     enum: SalesRankingOrderBy,
     default: SalesRankingOrderBy.Value,
