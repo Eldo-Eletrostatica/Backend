@@ -1,18 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  IsUrl,
-  MaxLength,
-  trim as TrimString,
-} from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import {
   CATEGORY_MAX_LENGTH,
   MATERIALS_MAX_LENGTH,
   SERVICE_TYPE_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../showcase-items.constants';
+import { TrimString } from './trim-string.transform';
 
 export class CreatePortfolioProjectDto {
   @ApiProperty({ maxLength: TITLE_MAX_LENGTH })
