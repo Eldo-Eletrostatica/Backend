@@ -149,3 +149,16 @@ _Avoid_: salesperson, salesman, vendor
 **CommissionRule** (regra de comissão):
 Percentual ou valor fixo de comissão de um funcionário, guardado no cadastro dele. Cada funcionário tem no máximo uma regra.
 _Avoid_: bonus, fee
+
+**CommissionReport** (relatório de comissões):
+Consolidação do total de vendas e comissões apuradas por funcionário em um determinado período, utilizada pela gestão para conferência e processamento de pagamentos.
+_Avoid_: commission statement, payment report
+
+**SalesRanking** (ranking de vendas):
+Classificação dos funcionários ordenada por valor ou volume de vendas realizadas em um determinado período, utilizada pela gestão para acompanhamento de desempenho e incentivo comercial.
+_Avoid_: leaderboard, sales contest
+
+**ReportExport** (exportação de relatório):
+Arquivo gerado no formato de planilha a partir dos dados do relatório ou do ranking exibidos na tela, para download imediato.
+_Avoid_: report download, data dump
+
