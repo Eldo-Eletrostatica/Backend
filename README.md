@@ -66,6 +66,10 @@ O `node_modules` do container fica num volume próprio, que o `--build` sozinho 
 docker compose up -d --build -V
 ```
 
+### Chromium para o relatório em PDF
+
+A exportação do relatório estatístico em PDF (`GET /statistics/export`, US12) usa o Puppeteer, que imprime uma página HTML num Chromium escondido. O Chrome que o Puppeteer baixa sozinho não roda no Alpine da imagem, então o `Dockerfile` instala o Chromium do Alpine e aponta o Puppeteer para ele (`PUPPETEER_EXECUTABLE_PATH`). Depois de atualizar a branch com essa mudança, rode `docker compose up -d --build -V` uma vez. Fora do Docker, como no CI, o Puppeteer usa o Chrome que ele baixa no `npm install`.
+
 ### Se a stack ficar "presa" (containers travados, erro de rede/DNS entre backend e postgres)
 
 Recrie do zero:
