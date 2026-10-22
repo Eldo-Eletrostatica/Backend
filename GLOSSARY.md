@@ -157,3 +157,7 @@ _Avoid_: analytics, metrics, dashboard (o dashboard é a tela do Frontend)
 **ConversionRate** (taxa de conversão):
 Dos orçamentos criados no período, a fração que já virou venda, mesmo que a venda tenha sido fechada depois do período. Vai de 0 a 1 e fica vazia quando o período não tem orçamentos.
 _Avoid_: close rate, success rate
+
+**StatisticsReport** (relatório estatístico):
+Arquivo com as análises estatísticas de um período, para o gestor levar a reuniões: PDF com gráfico ou planilha XLSX. Traz os mesmos números do dashboard e não é gerado para um período sem dados.
+_Avoid_: export (é a ação, não o arquivo), dashboard

@@ -1,11 +1,15 @@
+import { StreamableFile } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ExportFormat } from './dto/export-statistics-query.dto';
 import { StatisticsResponseDto } from './dto/statistics-response.dto';
 import { StatisticsController } from './statistics.controller';
+import { StatisticsExportService } from './statistics-export.service';
 import { StatisticsService } from './statistics.service';
 
 describe('StatisticsController', () => {
   let controller: StatisticsController;
   let getStatistics: jest.Mock;
+  let exportStatistics: jest.Mock;
   const serviceResponse: StatisticsResponseDto = {
     startDate: '2026-10-01',
     endDate: '2026-10-31',
@@ -18,10 +22,14 @@ describe('StatisticsController', () => {
 
   beforeEach(async () => {
     getStatistics = jest.fn().mockResolvedValue(serviceResponse);
+    exportStatistics = jest.fn();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StatisticsController],
-      providers: [{ provide: StatisticsService, useValue: { getStatistics } }],
+      providers: [
+        { provide: StatisticsService, useValue: { getStatistics } },
+        { provide: StatisticsExportService, useValue: { exportStatistics } },
+      ],
     }).compile();
 
     controller = module.get<StatisticsController>(StatisticsController);
@@ -35,4 +43,30 @@ describe('StatisticsController', () => {
     );
     expect(getStatistics).toHaveBeenCalledWith(period);
   });
+
+  it.each([
+    ['application/pdf', 'estatisticas.pdf'],
+    ['application/vnd.ms-excel', 'estatisticas.xlsx'],
+  ])(
+    'devolve o arquivo exportado como download (%s, %s)',
+    async (contentType, fileName) => {
+      exportStatistics.mockResolvedValue({
+        content: Buffer.from('arquivo'),
+        contentType,
+        fileName,
+      });
+
+      const file = await controller.exportStatistics({
+        startDate: '2026-10-01',
+        endDate: '2026-10-31',
+        format: ExportFormat.Pdf,
+      });
+
+      expect(file).toBeInstanceOf(StreamableFile);
+      expect(file.getHeaders()).toMatchObject({
+        type: contentType,
+        disposition: `attachment; filename="${fileName}"`,
+      });
+    },
+  );
 });
