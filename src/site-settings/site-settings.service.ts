@@ -75,17 +75,42 @@ export class SiteSettingsService {
       return currentDraft;
     });
     // Draft and published are the same right after publishing, so the draft
-    // holds every image still in use. The site already shows the new settings;
-    // an image left behind by a failure is deleted on the next publish.
+    // holds every image still in use.
+    await this.deleteUnusedImages([draft.logo.imageUrl, draft.banner.imageUrl]);
+    return draft;
+  }
+
+  // A null draft starts again as a copy of the published settings, which then
+  // hold every image still in use.
+  async discardVisualDraft(): Promise<VisualSettings> {
+    const draft = await this.updateLockedSettings((settings) => {
+      settings.visualDraft = null;
+      return this.draftOf(settings);
+    });
+    await this.deleteUnusedImages([draft.logo.imageUrl, draft.banner.imageUrl]);
+    return draft;
+  }
+
+  // Null in both columns means the default defined in code, so a later change
+  // of the default also reaches a restored site.
+  async restoreDefaultVisualSettings(): Promise<VisualSettings> {
+    await this.updateLockedSettings((settings) => {
+      settings.visualPublished = null;
+      settings.visualDraft = null;
+    });
+    // The default has no images, so none of the folder is in use anymore.
+    await this.deleteUnusedImages([]);
+    return DEFAULT_VISUAL_SETTINGS;
+  }
+
+  // The new settings are already saved; an image left behind by a bucket
+  // failure is deleted by the next action that cleans the folder.
+  private async deleteUnusedImages(usedUrls: (string | null)[]): Promise<void> {
     await this.storageService
-      .deleteUnusedImages(VISUAL_IMAGES_FOLDER, [
-        draft.logo.imageUrl,
-        draft.banner.imageUrl,
-      ])
+      .deleteUnusedImages(VISUAL_IMAGES_FOLDER, usedUrls)
       .catch((error: unknown) =>
         this.logger.error('Falha ao apagar imagens sem uso do bucket', error),
       );
-    return draft;
   }
 
   // Only images sent through the upload route are accepted, so the cleanup on
