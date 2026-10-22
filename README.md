@@ -130,7 +130,9 @@ Imagens e PDFs ficam num armazenamento compatível com S3, e o banco guarda só 
 
 No desenvolvimento, a chave `eldo-dev` (definida em `docker/seaweedfs/s3.json`) pode enviar e apagar arquivos, e a leitura é pública, como num bucket R2 com acesso público: um arquivo enviado como `portfolio/capa.jpg` abre em `http://localhost:8333/eldo/portfolio/capa.jpg`. Listar o bucket e enviar arquivos sem chave dão 403.
 
-Os arquivos ficam no volume `seaweedfs_data`, e o `docker compose down -v` apaga junto com o banco.
+Os arquivos ficam no volume `seaweedfs_data`, e o `docker compose down -v` apaga junto com o banco. O `seaweedfs-setup` também cria o bucket `eldo-test`, que os testes de integração usam no lugar do `eldo` (`test/setup-env.ts`). Assim os testes podem apagar o que enviam sem mexer nas imagens de desenvolvimento.
+
+No código, só o módulo `storage` (`src/storage/`) fala com o bucket. Uma feature com upload importa o `StorageModule`, injeta o `StorageService` e chama `upload(arquivo, pasta)`, que guarda o arquivo com nome aleatório e devolve `{ key, url }`. A URL é o que vai para o banco. O formato e o tamanho aceitos são validados pela própria feature, antes do upload. Exemplo: a configuração visual do site (`src/site-settings/`) aceita PNG, JPEG e WebP até 5 MB na pasta `visual/` e, ao publicar, apaga as imagens dessa pasta que não estão em uso e foram enviadas há mais de 1 hora.
 
 ## Rodando localmente sem Docker (alternativa)
 
@@ -169,6 +171,8 @@ docker compose exec postgres psql -U postgres -c '\dt'
 Todo PR para a `main` e todo push nela rodam o workflow `.github/workflows/ci.yml` no GitHub Actions: `npm ci`, `lint:check`, `build`, testes unitários e testes de integração contra um Postgres de serviço.
 
 A `main` é protegida: só recebe mudanças por PR, e o PR só pode ser mergeado com o check **Lint, build e testes** verde e a branch atualizada com a `main`. A regra vale também para administradores.
+
+Os testes de integração rodam também contra o SeaweedFS, que o CI sobe pelo `docker-compose.yml`.
 
 Para não descobrir o erro só no CI, rode antes de abrir o PR:
 

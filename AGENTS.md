@@ -19,10 +19,24 @@ Três repositórios separados na organização `Eldo-Eletrostatica`, que se comu
 
 ## Requisitos
 
-As regras de produto vêm das User Stories. Cada US é uma issue no repo `Documentacao` (`gh issue view <n> --repo Eldo-Eletrostatica/Documentacao`), com sub-issues técnicas no `Frontend` e no `Backend`. Leia a US antes de implementar uma funcionalidade. Dois pontos que já confundiram:
+As regras de produto vêm das User Stories. Cada US é uma issue no repo `Documentacao` (`gh issue view <n> --repo Eldo-Eletrostatica/Documentacao`), com sub-issues técnicas no `Frontend` e no `Backend`. Leia a US antes de implementar uma funcionalidade. A US04 (avaliação feita no próprio site) foi descontinuada: as avaliações vêm só do Google (US05).
 
-- A US04 (avaliação feita no próprio site) foi descontinuada: as avaliações vêm só do Google (US05).
-- Imagens e PDFs ficam num armazenamento compatível com S3: SeaweedFS no `docker compose` do Backend em desenvolvimento e Cloudflare R2, na conta do cliente, em produção (ADR 0006). O banco guarda só a URL.
+Quando o texto de uma US contradiz uma ADR, vale a ADR. Aponte a diferença para o grupo ajustar a US, em vez de implementar o texto antigo.
+
+## Decisões de arquitetura
+
+As decisões que valem para os três repos são ADRs no repo `Documentacao`, em `docs/adr/`, publicadas em https://eldo-eletrostatica.github.io/Documentacao/. Antes de mexer em banco, módulos ou integrações, leia a ADR da área (`gh api repos/Eldo-Eletrostatica/Documentacao/contents/docs/adr/<arquivo> --jq .content | base64 -d`). Código que contradiz uma ADR só entra com uma ADR nova que a revise, aprovada pelo grupo.
+
+O que cada uma obriga:
+
+- **0001 (chaves UUID e protocolo aleatório):** toda PK é UUID. O protocolo da OS é aleatório, com 8 caracteres e sem 0, O, 1 e I, nunca sequencial.
+- **0002 (exclusão lógica seletiva):** só `employees`, `customers`, `catalog_items` e `inventory_items` têm `deleted_at`; as demais tabelas apagam de verdade.
+- **0003 (preços e comissões congelados):** o item do pedido copia o preço por m² e o fator do catálogo, e a venda guarda a comissão calculada no lançamento. Mostre sempre o valor guardado, nunca recalcule.
+- **0004:** substituída pela 0005.
+- **0005 (modelo de 9 tabelas):** não crie tabela sem uma ADR que revise esta. Contato, orçamento, venda e OS são etapas de `orders`; tipos de pintura e materiais ficam em `catalog_items`; portfólio e eventos em `showcase_items`; categoria e fornecedor são texto no próprio registro; a comissão é uma regra por funcionário, em `employees`.
+- **0006 (armazenamento):** imagens e PDFs ficam num armazenamento compatível com S3 (SeaweedFS no desenvolvimento, Cloudflare R2 do cliente em produção), e o banco guarda só a URL.
+
+Ao criar ou alterar uma ADR, atualize esta lista nos três repos.
 
 ## Idioma
 
@@ -67,7 +81,7 @@ GitHub: USs no repo `Documentacao`, sub-issues técnicas nos repos de código, t
 
 ### Domain docs
 
-Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` na raiz de cada repo; as ADRs ficam só no repo `Documentacao`, em `docs/adr/`, com o resumo em "Decisões de arquitetura" acima. See `docs/agents/domain.md`.
 
 ## Este repo: Backend
 
@@ -81,6 +95,7 @@ Single-context: `GLOSSARY.md` e `docs/adr/` na raiz de cada repo. See `docs/agen
 
   Uma feature nova, sem pasta, nasce com `npx -p @nestjs/cli@11 nest g resource <nome> --type rest --crud`. O `<nome>` vem do `GLOSSARY.md`, em inglês, kebab-case e no plural (`service-orders`): ele vira a pasta e a rota (`/service-orders`), e a entity e os DTOs saem no singular (`ServiceOrder`). O comando baixa o CLI porque o `node_modules` do host fica vazio: as dependências vivem no container.
 - O pedido passa por várias USs: contato, orçamento, venda, OS e consulta pelo protocolo (ADR 0005). `src/orders/` guarda só as entities `Order` e `OrderItem`. Cada caso de uso sobre o pedido tem módulo próprio, com o nome do termo do `GLOSSARY.md` (`src/sales/` para a venda da US21), com controller, service e DTOs, e importa o `OrdersModule` e os módulos das outras entities que usa. Assim cada US fica na sua pasta, sem disputar o mesmo service.
+- Arquivos (imagens e PDFs) passam pelo `StorageService` de `src/storage/` (ADR 0006): a feature importa o `StorageModule`, valida o formato e o tamanho do arquivo e chama `upload(arquivo, pasta)`, que devolve a URL a salvar no banco. Não instale outro SDK nem fale com o bucket por fora dele.
 - A entity gerada pelo `nest g resource` vem vazia. Adicione os decorators do TypeORM e registre a entity no module com `TypeOrmModule.forFeature([<Entity>])`; o `autoLoadEntities` do `app.module.ts` só carrega as entities registradas assim.
 - As entities usam propriedades em camelCase, gravadas no banco em snake_case pelo `SnakeNamingStrategy` (pacote `typeorm-naming-strategies`, configurado em `src/database/typeorm.config.ts`).
 - A PK de cada tabela se chama `<entidade>_id`, no singular (`customers.customer_id`, propriedade `customerId`), e não `id`. Uma FK tem exatamente o nome da PK que ela referencia (`orders.customer_id`). Quando a FK representa um papel, o papel vira prefixo do nome da PK (`orders.seller_employee_id`, `order_items.paint_catalog_item_id`). Declare o nome em toda relação com `@JoinColumn({ name: 'customer_id' })`: sem isso, o `SnakeNamingStrategy` junta o nome da relação ao da PK e gera `customer_customer_id`.
