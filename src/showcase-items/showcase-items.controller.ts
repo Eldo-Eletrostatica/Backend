@@ -28,17 +28,17 @@ import {
 } from '@nestjs/swagger';
 import { UploadedImageDto } from '../site-settings/dto/uploaded-image.dto';
 import { MAX_IMAGE_BYTES } from '../site-settings/image-format';
+import { CompanyEventResponseDto } from './dto/company-event-response.dto';
+import { CreateCompanyEventDto } from './dto/create-company-event.dto';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
   PaginatedPortfolioProjectsDto,
   PortfolioProjectResponseDto,
 } from './dto/portfolio-project-response.dto';
+import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
 import { UpdatePortfolioProjectDto } from './dto/update-portfolio-project.dto';
 import { ShowcaseItemsService } from './showcase-items.service';
-import { CompanyEventResponseDto } from './dto/company-event-response.dto';
-import { CreateCompanyEventDto } from './dto/create-company-event.dto';
-import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
 
 @ApiTags('showcase-items')
 @Controller('showcase-items')
@@ -49,7 +49,7 @@ export class ShowcaseItemsController {
   @ApiOperation({
     summary: 'Envia uma imagem da vitrine',
     description:
-      'Devolve a URL para salvar no projeto. Aceita PNG, JPEG e WebP até 5 MB.',
+      'Devolve a URL para salvar no projeto ou no evento. Aceita PNG, JPEG e WebP até 5 MB.',
   })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -70,6 +70,8 @@ export class ShowcaseItemsController {
   ): Promise<UploadedImageDto> {
     return this.showcaseItemsService.uploadShowcaseImage(file.buffer);
   }
+
+  // ---- Portfolio projects ----
 
   @Get('portfolio-projects')
   @ApiOkResponse({ type: PaginatedPortfolioProjectsDto })
@@ -118,6 +120,8 @@ export class ShowcaseItemsController {
     return this.showcaseItemsService.removePortfolioProject(showcaseItemId);
   }
 
+  // ---- Company events ----
+
   @Get('company-events')
   @ApiOkResponse({ type: [CompanyEventResponseDto] })
   findCompanyEvents() {
@@ -126,6 +130,7 @@ export class ShowcaseItemsController {
 
   @Get('company-events/:showcaseItemId')
   @ApiOkResponse({ type: CompanyEventResponseDto })
+  @ApiBadRequestResponse({ description: 'O id não é um UUID válido' })
   @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   findCompanyEvent(
     @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
@@ -134,11 +139,15 @@ export class ShowcaseItemsController {
   }
 
   @Post('company-events')
+  @ApiBadRequestResponse({
+    description: 'Dados inválidos ou limite de eventos atingido',
+  })
   createCompanyEvent(@Body() dto: CreateCompanyEventDto) {
     return this.showcaseItemsService.createCompanyEvent(dto);
   }
 
   @Patch('company-events/:showcaseItemId')
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   updateCompanyEvent(
     @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
     @Body() dto: UpdateCompanyEventDto,
@@ -148,6 +157,8 @@ export class ShowcaseItemsController {
 
   @Delete('company-events/:showcaseItemId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBadRequestResponse({ description: 'Mínimo de eventos atingido' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   removeCompanyEvent(
     @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
   ) {

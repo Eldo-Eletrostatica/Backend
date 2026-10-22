@@ -13,18 +13,26 @@ import {
   UNSUPPORTED_IMAGE_MESSAGE,
 } from '../site-settings/image-format';
 import { StorageService } from '../storage/storage.service';
+import { CompanyEventResponseDto } from './dto/company-event-response.dto';
+import { CreateCompanyEventDto } from './dto/create-company-event.dto';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
   PaginatedPortfolioProjectsDto,
   PortfolioProjectResponseDto,
 } from './dto/portfolio-project-response.dto';
+import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
 import { UpdatePortfolioProjectDto } from './dto/update-portfolio-project.dto';
 import {
   ShowcaseItem,
   ShowcaseItemType,
 } from './entities/showcase-item.entity';
-import { DEFAULT_PAGE_SIZE } from './showcase-items.constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_COMPANY_EVENTS,
+  MIN_COMPANY_EVENTS,
+  SHOWCASE_IMAGES_FOLDER,
+} from './showcase-items.constants';
 
 @Injectable()
 export class ShowcaseItemsService {
@@ -47,6 +55,8 @@ export class ShowcaseItemsService {
     );
     return { url };
   }
+
+  // ---- Portfolio projects ----
 
   async findPortfolioProjects(
     query: ListPortfolioProjectsQueryDto,
@@ -140,6 +150,76 @@ export class ShowcaseItemsService {
     await this.deleteImages(urls);
   }
 
+  // ---- Company events ----
+
+  // Vertical timeline of the site: newest event first.
+  async findCompanyEvents(): Promise<CompanyEventResponseDto[]> {
+    const events = await this.showcaseItemsRepository.find({
+      where: { type: ShowcaseItemType.CompanyEvent },
+      order: { eventDate: 'DESC', createdAt: 'DESC' },
+    });
+    return events.map((event) => CompanyEventResponseDto.fromEntity(event));
+  }
+
+  async findCompanyEvent(
+    showcaseItemId: string,
+  ): Promise<CompanyEventResponseDto> {
+    return CompanyEventResponseDto.fromEntity(
+      await this.findCompanyEventOrFail(showcaseItemId),
+    );
+  }
+
+  async createCompanyEvent(
+    dto: CreateCompanyEventDto,
+  ): Promise<CompanyEventResponseDto> {
+    this.assertImagesFromUpload([dto.imageUrl]);
+    const total = await this.countCompanyEvents();
+    if (total >= MAX_COMPANY_EVENTS) {
+      throw new BadRequestException(
+        `O limite é de ${MAX_COMPANY_EVENTS} eventos`,
+      );
+    }
+    const event = this.showcaseItemsRepository.create({
+      ...dto,
+      type: ShowcaseItemType.CompanyEvent,
+    });
+    return CompanyEventResponseDto.fromEntity(
+      await this.showcaseItemsRepository.save(event),
+    );
+  }
+
+  async updateCompanyEvent(
+    showcaseItemId: string,
+    dto: UpdateCompanyEventDto,
+  ): Promise<CompanyEventResponseDto> {
+    this.assertImagesFromUpload([dto.imageUrl]);
+    const event = await this.findCompanyEventOrFail(showcaseItemId);
+    const previousImageUrl = event.imageUrl;
+
+    Object.assign(event, dto);
+    const saved = await this.showcaseItemsRepository.save(event);
+
+    if (saved.imageUrl !== previousImageUrl) {
+      await this.deleteImages([previousImageUrl]);
+    }
+    return CompanyEventResponseDto.fromEntity(saved);
+  }
+
+  async removeCompanyEvent(showcaseItemId: string): Promise<void> {
+    const event = await this.findCompanyEventOrFail(showcaseItemId);
+    const total = await this.countCompanyEvents();
+    if (total <= MIN_COMPANY_EVENTS) {
+      throw new BadRequestException(
+        `É preciso manter ao menos ${MIN_COMPANY_EVENTS} eventos`,
+      );
+    }
+    const imageUrl = event.imageUrl;
+    await this.showcaseItemsRepository.remove(event);
+    await this.deleteImages([imageUrl]);
+  }
+
+  // ---- Shared helpers ----
+
   // Only images sent through the upload route are accepted, so every picture
   // of the showcase lives in the bucket.
   private assertImagesFromUpload(urls: Array<string | null | undefined>): void {
@@ -173,78 +253,22 @@ export class ShowcaseItemsService {
     try {
       await this.storageService.deleteMany(keys);
     } catch (error) {
-      this.logger.error('Falha ao apagar imagens da vitrine do bucket', error);
-    }
-  }
+      const message = error instanceof Error ? error.message : String(error);
 
-  // Vertical timeline of the site: newest event first.
-  async findCompanyEvents(): Promise<CompanyEventResponseDto[]> {
-    const events = await this.showcaseItemsRepository.find({
-      where: { type: ShowcaseItemType.CompanyEvent },
-      order: { eventDate: 'DESC', createdAt: 'DESC' },
-    });
-    return events.map((event) => CompanyEventResponseDto.fromEntity(event));
-  }
-
-  async findCompanyEvent(
-    showcaseItemId: string,
-  ): Promise<CompanyEventResponseDto> {
-    return CompanyEventResponseDto.fromEntity(
-      await this.findCompanyEventOrFail(showcaseItemId),
-    );
-  }
-
-  async createCompanyEvent(
-    dto: CreateCompanyEventDto,
-  ): Promise<CompanyEventResponseDto> {
-    const total = await this.showcaseItemsRepository.countBy({
-      type: ShowcaseItemType.CompanyEvent,
-    });
-    if (total >= MAX_COMPANY_EVENTS) {
-      throw new BadRequestException(
-        `O limite é de ${MAX_COMPANY_EVENTS} eventos`,
+      this.logger.error(
+        'Falha ao apagar imagens da vitrine do bucket',
+        message,
       );
     }
-    const event = this.showcaseItemsRepository.create({
-      ...dto,
+  }
+
+  private countCompanyEvents(): Promise<number> {
+    return this.showcaseItemsRepository.countBy({
       type: ShowcaseItemType.CompanyEvent,
     });
-    return CompanyEventResponseDto.fromEntity(
-      await this.showcaseItemsRepository.save(event),
-    );
   }
 
-  async updateCompanyEvent(
-    showcaseItemId: string,
-    dto: UpdateCompanyEventDto,
-  ): Promise<CompanyEventResponseDto> {
-    const event = await this.findCompanyEventOrFail(showcaseItemId);
-    Object.assign(event, dto);
-    return CompanyEventResponseDto.fromEntity(
-      await this.showcaseItemsRepository.save(event),
-    );
-  }
-
-  async removeCompanyEvent(showcaseItemId: string): Promise<void> {
-    const event = await this.findCompanyEventOrFail(showcaseItemId);
-    await this.showcaseItemsRepository.remove(event);
-  }
-
-  // Projects share the table, so every lookup filters by the event type.
-  private async findCompanyEventOrFail(
-    showcaseItemId: string,
-  ): Promise<ShowcaseItem> {
-    const event = await this.showcaseItemsRepository.findOneBy({
-      showcaseItemId,
-      type: ShowcaseItemType.CompanyEvent,
-    });
-    if (!event) {
-      throw new NotFoundException('Evento não encontrado');
-    }
-    return event;
-  }
-
-  // Events share the table, so every lookup filters by the portfolio type.
+  // Events and projects share the table, so every lookup filters by type.
   private async findPortfolioProjectOrFail(
     showcaseItemId: string,
   ): Promise<ShowcaseItem> {
@@ -256,5 +280,18 @@ export class ShowcaseItemsService {
       throw new NotFoundException('Projeto do portfólio não encontrado');
     }
     return project;
+  }
+
+  private async findCompanyEventOrFail(
+    showcaseItemId: string,
+  ): Promise<ShowcaseItem> {
+    const event = await this.showcaseItemsRepository.findOneBy({
+      showcaseItemId,
+      type: ShowcaseItemType.CompanyEvent,
+    });
+    if (!event) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+    return event;
   }
 }
