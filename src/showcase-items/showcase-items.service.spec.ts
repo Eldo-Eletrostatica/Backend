@@ -59,14 +59,14 @@ describe('ShowcaseItemsService', () => {
   });
 
   it.each([
-    { method: 'findPortfolioProject' as const },
-    { method: 'removePortfolioProject' as const },
+    { method: 'findPortfolioProject' as const, id: 'missing-id' },
+    { method: 'removePortfolioProject' as const, id: 'other-missing-id' },
   ])(
-    '$method throws NotFoundException for an unknown id',
-    async ({ method }) => {
+    '$method throws NotFoundException for the unknown id $id',
+    async ({ method, id }) => {
       repository.findOneBy.mockResolvedValue(null);
 
-      await expect(service[method]('missing-id')).rejects.toBeInstanceOf(
+      await expect(service[method](id)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     },

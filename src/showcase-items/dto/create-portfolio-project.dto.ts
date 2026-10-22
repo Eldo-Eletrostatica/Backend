@@ -5,6 +5,7 @@ import {
   IsString,
   IsUrl,
   MaxLength,
+  trim as TrimString,
 } from 'class-validator';
 import {
   CATEGORY_MAX_LENGTH,
@@ -25,13 +26,13 @@ export class CreatePortfolioProjectDto {
   @IsNotEmpty()
   description: string;
 
-  // Cover image. The storage service is still undecided, so only the URL is received.
   @ApiProperty()
-  @IsUrl()
+  @IsString()
+  @IsNotEmpty()
   imageUrl: string;
 
   @ApiProperty({ maxLength: CATEGORY_MAX_LENGTH })
-  @IsString()
+  @TrimString()
   @IsNotEmpty()
   @MaxLength(CATEGORY_MAX_LENGTH)
   category: string;
@@ -50,11 +51,11 @@ export class CreatePortfolioProjectDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsString()
   beforeUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsString()
   afterUrl?: string;
 }

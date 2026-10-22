@@ -4,3 +4,5 @@ export const TITLE_MAX_LENGTH = 150;
 export const CATEGORY_MAX_LENGTH = 100;
 export const SERVICE_TYPE_MAX_LENGTH = 150;
 export const MATERIALS_MAX_LENGTH = 255;
+
+export const SHOWCASE_IMAGES_FOLDER = 'showcase';
