@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
 import { Employee } from '../employees/entities/employee.entity';
 import { Order, SALE_STATUSES } from '../orders/entities/order.entity';
-import { endOfBrasiliaDay, startOfBrasiliaDay } from './brasilia-day';
+import { endOfBrasiliaDay, startOfBrasiliaDay } from '../common/brasilia-day';
 import { AccumulatedCommissionsResponseDto } from './dto/accumulated-commissions-response.dto';
 import { GetCommissionsQueryDto } from './dto/get-commissions-query.dto';
 
