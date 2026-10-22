@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { IMAGE_CLEANUP_GRACE_PERIOD_MS } from '../src/storage/storage.service';
 import {
   ShowcaseItem,
   ShowcaseItemType,
@@ -47,7 +48,7 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
     return (response.body as { url: string }).url;
   };
 
-  // Each project gets its own picture: removing a project deletes it.
+  // Each project gets its own picture unless the test passes one.
   const createProject = async (overrides: object = {}) =>
     api()
       .post(PROJECTS_PATH)
@@ -76,9 +77,14 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
     );
 
   beforeAll(async () => {
+    // Without the grace period, every change deletes the images the test just
+    // uploaded and did not save in a project.
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(IMAGE_CLEANUP_GRACE_PERIOD_MS)
+      .useValue(0)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -247,6 +253,24 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
 
       expect(await statusOf(oldUrl)).toBe(404);
       expect(await statusOf(newUrl)).toBe(200);
+    });
+
+    it('apaga um upload que nunca foi salvo em um projeto', async () => {
+      const abandonedUrl = await uploadImage();
+
+      await createdId();
+
+      expect(await statusOf(abandonedUrl)).toBe(404);
+    });
+
+    it('mantém a imagem usada por outro projeto ao remover um deles', async () => {
+      const sharedUrl = await uploadImage();
+      const firstId = await createdId({ imageUrl: sharedUrl });
+      await createdId({ imageUrl: sharedUrl });
+
+      await api().delete(`${PROJECTS_PATH}/${firstId}`).expect(204);
+
+      expect(await statusOf(sharedUrl)).toBe(200);
     });
 
     it('remove a foto de antes com null no PATCH', async () => {

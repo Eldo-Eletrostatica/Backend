@@ -6,7 +6,7 @@ import {
   SERVICE_TYPE_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../showcase-items.constants';
-import { IsOmittable } from './is-omittable';
+import { IsOmittable } from '../../common/is-omittable';
 import { TrimString } from './trim-string.transform';
 
 export class UpdatePortfolioProjectDto {

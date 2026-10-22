@@ -10,12 +10,14 @@ import { TrimString } from './trim-string.transform';
 
 export class CreatePortfolioProjectDto {
   @ApiProperty({ maxLength: TITLE_MAX_LENGTH })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(TITLE_MAX_LENGTH)
   title: string;
 
   @ApiProperty()
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   description: string;
@@ -27,17 +29,20 @@ export class CreatePortfolioProjectDto {
 
   @ApiProperty({ maxLength: CATEGORY_MAX_LENGTH })
   @TrimString()
+  @IsString()
   @IsNotEmpty()
   @MaxLength(CATEGORY_MAX_LENGTH)
   category: string;
 
   @ApiProperty({ maxLength: SERVICE_TYPE_MAX_LENGTH })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(SERVICE_TYPE_MAX_LENGTH)
   serviceType: string;
 
   @ApiProperty({ maxLength: MATERIALS_MAX_LENGTH })
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(MATERIALS_MAX_LENGTH)

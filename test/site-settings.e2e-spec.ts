@@ -4,8 +4,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { IMAGE_CLEANUP_GRACE_PERIOD_MS } from '../src/site-settings/site-settings.service';
-import { StorageService } from '../src/storage/storage.service';
+import {
+  IMAGE_CLEANUP_GRACE_PERIOD_MS,
+  StorageService,
+} from '../src/storage/storage.service';
 import { DEFAULT_VISUAL_SETTINGS } from '../src/site-settings/visual-settings';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;

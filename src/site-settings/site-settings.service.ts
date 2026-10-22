@@ -1,21 +1,18 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { StorageService } from '../storage/storage.service';
-import { UploadedImageDto } from './dto/uploaded-image.dto';
-import { SiteSetting } from './entities/site-setting.entity';
+import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import {
   detectImageFormat,
-  isUploadedImageName,
   UNSUPPORTED_IMAGE_MESSAGE,
-} from './image-format';
-import { findUnusedImageKeys } from './unused-images';
+} from '../storage/image-format';
+import { StorageService } from '../storage/storage.service';
+import { SiteSetting } from './entities/site-setting.entity';
 import {
   applyVisualSettingsPatch,
   DEFAULT_VISUAL_SETTINGS,
@@ -26,11 +23,6 @@ import {
 // Folder of the bucket with the logo and banner images.
 export const VISUAL_IMAGES_FOLDER = 'visual';
 
-// How long an unused upload survives a publish, in case its URL is still on
-// the way to the draft. A provider, so the integration tests can set it to 0.
-export const IMAGE_CLEANUP_GRACE_PERIOD_MS = 'IMAGE_CLEANUP_GRACE_PERIOD_MS';
-export const DEFAULT_IMAGE_CLEANUP_GRACE_PERIOD_MS = 60 * 60 * 1000;
-
 @Injectable()
 export class SiteSettingsService {
   private readonly logger = new Logger(SiteSettingsService.name);
@@ -39,8 +31,6 @@ export class SiteSettingsService {
     @InjectRepository(SiteSetting)
     private readonly siteSettingRepository: Repository<SiteSetting>,
     private readonly storageService: StorageService,
-    @Inject(IMAGE_CLEANUP_GRACE_PERIOD_MS)
-    private readonly imageCleanupGracePeriodMs: number,
   ) {}
 
   async uploadVisualImage(content: Buffer): Promise<UploadedImageDto> {
@@ -84,39 +74,28 @@ export class SiteSettingsService {
       settings.visualPublished = currentDraft;
       return currentDraft;
     });
-    // The site already shows the new settings; an image left behind is
-    // deleted on the next publish.
-    await this.deleteUnusedImages(draft).catch((error: unknown) =>
-      this.logger.error('Falha ao apagar imagens sem uso do bucket', error),
-    );
+    // Draft and published are the same right after publishing, so the draft
+    // holds every image still in use. The site already shows the new settings;
+    // an image left behind by a failure is deleted on the next publish.
+    await this.storageService
+      .deleteUnusedImages(VISUAL_IMAGES_FOLDER, [
+        draft.logo.imageUrl,
+        draft.banner.imageUrl,
+      ])
+      .catch((error: unknown) =>
+        this.logger.error('Falha ao apagar imagens sem uso do bucket', error),
+      );
     return draft;
-  }
-
-  // Draft and published are the same right after publishing, so the draft
-  // holds every image still in use.
-  private async deleteUnusedImages(settings: VisualSettings): Promise<void> {
-    const storedImages =
-      await this.storageService.listFiles(VISUAL_IMAGES_FOLDER);
-    const unusedKeys = findUnusedImageKeys(
-      storedImages,
-      [settings.logo.imageUrl, settings.banner.imageUrl],
-      this.storageService.publicUrl,
-      new Date(),
-      this.imageCleanupGracePeriodMs,
-    );
-    await this.storageService.deleteMany(unusedKeys);
   }
 
   // Only images sent through the upload route are accepted, so the cleanup on
   // publish knows every image the settings use.
   private assertImagesFromUpload(patch: VisualSettingsPatch): void {
-    const imagesFolderUrl = `${this.storageService.publicUrl}/${VISUAL_IMAGES_FOLDER}/`;
-    const isUploadedImageUrl = (url: string) =>
-      url.startsWith(imagesFolderUrl) &&
-      isUploadedImageName(url.slice(imagesFolderUrl.length));
     const imageUrls = [patch.logo?.imageUrl, patch.banner?.imageUrl];
     const hasForeignImage = imageUrls.some(
-      (url) => typeof url === 'string' && !isUploadedImageUrl(url),
+      (url) =>
+        typeof url === 'string' &&
+        !this.storageService.isUploadedImageUrl(url, VISUAL_IMAGES_FOLDER),
     );
     if (hasForeignImage) {
       throw new BadRequestException(

@@ -22,19 +22,19 @@ describe('ShowcaseItemsService', () => {
   const repository = {
     findAndCount: jest.fn(),
     findOneBy: jest.fn(),
+    find: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
   };
   const storageService = {
-    publicUrl: PUBLIC_URL,
     upload: jest.fn(),
-    deleteMany: jest.fn(),
+    isUploadedImageUrl: jest.fn(),
+    deleteUnusedImages: jest.fn(),
   };
 
   beforeEach(async () => {
     jest.resetAllMocks();
-    storageService.publicUrl = PUBLIC_URL;
     const moduleRef = await Test.createTestingModule({
       providers: [
         ShowcaseItemsService,
@@ -92,26 +92,31 @@ describe('ShowcaseItemsService', () => {
   );
 
   it.each([
-    { origin: 'another site', url: 'https://exemplo.com/capa.jpg' },
-    {
-      origin: 'another bucket folder',
-      url: `${PUBLIC_URL}/visual/${STORED_NAME}`,
+    { photo: 'imageUrl' as const, url: 'https://exemplo.com/capa.jpg' },
+    { photo: 'beforeUrl' as const, url: `${PUBLIC_URL}/visual/${STORED_NAME}` },
+  ])(
+    'rejects a $photo the upload route did not return',
+    async ({ photo, url }) => {
+      storageService.isUploadedImageUrl.mockImplementation(
+        (candidate: string) => candidate !== url,
+      );
+
+      await expect(
+        service.createPortfolioProject({
+          ...validProject,
+          imageUrl: STORED_URL,
+          [photo]: url,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(repository.save).not.toHaveBeenCalled();
     },
-    {
-      origin: 'a name the upload does not generate',
-      url: `${PUBLIC_URL}/showcase/capa.png`,
-    },
-  ])('rejects a cover from $origin', async ({ url }) => {
-    await expect(
-      service.createPortfolioProject({ ...validProject, imageUrl: url }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(repository.save).not.toHaveBeenCalled();
-  });
+  );
 
   it.each([
     { photo: 'beforeUrl' as const, label: 'before photo' },
     { photo: 'afterUrl' as const, label: 'after photo' },
   ])('accepts the $label from the bucket', async ({ photo }) => {
+    storageService.isUploadedImageUrl.mockReturnValue(true);
     repository.create.mockImplementation((entity: object) => entity);
     repository.save.mockImplementation((entity: object) =>
       Promise.resolve({
@@ -120,6 +125,7 @@ describe('ShowcaseItemsService', () => {
         createdAt: new Date(),
       }),
     );
+    repository.find.mockResolvedValue([]);
 
     const result = await service.createPortfolioProject({
       ...validProject,
@@ -132,30 +138,52 @@ describe('ShowcaseItemsService', () => {
 
   it.each([
     {
-      case: 'only the cover',
-      beforeUrl: null,
-      expectedKeys: [`showcase/${STORED_NAME}`],
+      case: 'the pictures of the remaining items',
+      remainingItems: [
+        { imageUrl: STORED_URL, beforeUrl: null, afterUrl: null },
+      ],
+      expectedUsedUrls: [STORED_URL, null, null],
     },
     {
-      case: 'the cover and the before photo',
-      beforeUrl: `${PUBLIC_URL}/showcase/other.png`,
-      expectedKeys: [`showcase/${STORED_NAME}`, 'showcase/other.png'],
+      case: 'no picture when the table is empty',
+      remainingItems: [],
+      expectedUsedUrls: [],
     },
   ])(
-    'deletes from the bucket $case of a removed project',
-    async ({ beforeUrl, expectedKeys }) => {
-      repository.findOneBy.mockResolvedValue({
-        showcaseItemId: 'project-id',
-        imageUrl: STORED_URL,
-        beforeUrl,
-        afterUrl: null,
-      });
+    'keeps in the bucket $case after a removal',
+    async ({ remainingItems, expectedUsedUrls }) => {
+      repository.findOneBy.mockResolvedValue({ showcaseItemId: 'project-id' });
       repository.remove.mockResolvedValue(undefined);
-      storageService.deleteMany.mockResolvedValue(undefined);
+      repository.find.mockResolvedValue(remainingItems);
+      storageService.deleteUnusedImages.mockResolvedValue(undefined);
 
       await service.removePortfolioProject('project-id');
 
-      expect(storageService.deleteMany).toHaveBeenCalledWith(expectedKeys);
+      expect(storageService.deleteUnusedImages).toHaveBeenCalledWith(
+        'showcase',
+        expectedUsedUrls,
+      );
     },
   );
+
+  it.each([
+    { operation: 'listing the items', failing: 'find' as const },
+    {
+      operation: 'cleaning the bucket',
+      failing: 'deleteUnusedImages' as const,
+    },
+  ])('still removes the project when $operation fails', async ({ failing }) => {
+    repository.findOneBy.mockResolvedValue({ showcaseItemId: 'project-id' });
+    repository.remove.mockResolvedValue(undefined);
+    repository.find.mockResolvedValue([]);
+    storageService.deleteUnusedImages.mockResolvedValue(undefined);
+    const failingMock =
+      failing === 'find' ? repository.find : storageService.deleteUnusedImages;
+    failingMock.mockRejectedValue(new Error('fora do ar'));
+
+    await expect(
+      service.removePortfolioProject('project-id'),
+    ).resolves.toBeUndefined();
+    expect(repository.remove).toHaveBeenCalled();
+  });
 });

@@ -26,8 +26,8 @@ import {
   ApiPayloadTooLargeResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { UploadedImageDto } from '../site-settings/dto/uploaded-image.dto';
-import { MAX_IMAGE_BYTES } from '../site-settings/image-format';
+import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
+import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
