@@ -14,6 +14,8 @@ import { SalesModule } from './sales/sales.module';
 import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
 import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
+import { CommissionRulesModule } from './commission-rules/commission-rules.module';
+import { CommissionsModule } from './commissions/commissions.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { StockMovementsModule } from './stock-movements/stock-movements.module';
     ShowcaseItemsModule,
     SiteSettingsModule,
     SalesModule,
+    CommissionRulesModule,
+    CommissionsModule,
   ],
   controllers: [AppController],
   providers: [

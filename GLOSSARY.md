@@ -103,8 +103,12 @@ _Avoid_: event (sozinho, colide com os eventos do DOM e do Node)
 ### Configuração do site
 
 **VisualSettings** (configuração visual):
-Tema, logotipo, banners e textos da página inicial. Tem a versão publicada, que o site mostra, e um rascunho que o administrador pré-visualiza antes de publicar; pode ser restaurada para o padrão a qualquer momento.
+Cores do tema, logotipo, banner e textos da página inicial. Tem a versão publicada, que o site mostra, e um rascunho que o administrador edita e pré-visualiza antes de publicar; pode ser restaurada para o padrão a qualquer momento.
 _Avoid_: theme (sozinho), layout
+
+**Banner** (banner):
+Bloco do topo da página inicial, com chamada, título, texto em destaque, descrição e imagem.
+_Avoid_: hero, destaque
 
 ### Gestão interna
 

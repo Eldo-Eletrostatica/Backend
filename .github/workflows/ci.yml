@@ -41,6 +41,12 @@ jobs:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       DB_NAME: postgres
+      S3_ENDPOINT: http://localhost:8333
+      S3_REGION: auto
+      S3_BUCKET: eldo
+      S3_ACCESS_KEY_ID: eldo-dev
+      S3_SECRET_ACCESS_KEY: eldo-dev-secret
+      S3_PUBLIC_URL: http://localhost:8333/eldo
 
     steps:
       - uses: actions/checkout@v4
@@ -58,5 +64,10 @@ jobs:
       - run: npm run build
 
       - run: npm run test
+
+      # Service containers cannot mount repository files, so the S3 storage
+      # starts from the compose file, which also creates the bucket.
+      - run: docker compose up -d --wait seaweedfs
+      - run: docker compose run --rm seaweedfs-setup
 
       - run: npm run test:e2e
