@@ -40,6 +40,9 @@ Variáveis disponíveis (`.env.example`):
 | `S3_ACCESS_KEY_ID` | Chave de acesso ao bucket |
 | `S3_SECRET_ACCESS_KEY` | Segredo da chave de acesso |
 | `S3_PUBLIC_URL` | URL pública do bucket, usada para montar o link salvo no banco |
+| `GOOGLE_PLACES_API_KEY` | Chave da Places API do Google Cloud, usada pela rota `/reviews` |
+| `GOOGLE_PLACE_ID` | Place ID da Eldo no Google, a empresa cujas avaliações aparecem no site |
+| `USE_SAMPLE_REVIEWS` | Com `true`, a rota `/reviews` devolve avaliações de exemplo no lugar das do Google. O `docker-compose.yml` liga por padrão, para o desenvolvimento rodar sem chave. Em produção, deixe `false` |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 

@@ -16,6 +16,7 @@ import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
 import { CommissionRulesModule } from './commission-rules/commission-rules.module';
 import { CommissionsModule } from './commissions/commissions.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CommissionsModule } from './commissions/commissions.module';
     SalesModule,
     CommissionRulesModule,
     CommissionsModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
   providers: [
