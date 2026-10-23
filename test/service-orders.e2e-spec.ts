@@ -277,6 +277,42 @@ describe('Ordens de serviço (e2e)', () => {
     expect(ids).toEqual([overdue.orderId]);
   });
 
+  it('não considera atrasada a OS que vence hoje em Brasília', async () => {
+    const dueToday = await insertOrder(OrderStatus.Queued, '2026-10-21');
+    const overdue = await insertOrder(OrderStatus.InProduction, '2026-10-20');
+    jest.useFakeTimers({
+      now: new Date('2026-10-22T01:00:00.000Z'),
+      doNotFake: [
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+        'setImmediate',
+        'clearImmediate',
+        'setInterval',
+        'clearInterval',
+        'setTimeout',
+        'clearTimeout',
+        'nextTick',
+        'hrtime',
+      ],
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get('/service-orders/overdue')
+        .expect(200);
+      const ids = (response.body as ServiceOrderResponse[])
+        .map((order) => order.orderId)
+        .filter((orderId) => created.orderIds.includes(orderId));
+      expect(ids).toEqual([overdue.orderId]);
+      expect(ids).not.toContain(dueToday.orderId);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('responde lista vazia quando não há atraso', async () => {
     await insertOrder(OrderStatus.Queued, FUTURE_DUE_DATE);
     const response = await request(app.getHttpServer())

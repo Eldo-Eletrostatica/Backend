@@ -3,6 +3,7 @@ import {
   endOfBrasiliaDay,
   startOfBrasiliaDay,
   toBrasiliaPeriod,
+  todayInBrasilia,
 } from './brasilia-day';
 
 describe('startOfBrasiliaDay', () => {
@@ -26,6 +27,20 @@ describe('endOfBrasiliaDay', () => {
       expect(endOfBrasiliaDay(date).toISOString()).toBe(expectedInstant);
     },
   );
+});
+
+describe('todayInBrasilia', () => {
+  it.each([
+    [
+      'antes da meia-noite de Brasília',
+      '2026-10-22T02:59:59.999Z',
+      '2026-10-21',
+    ],
+    ['na virada do dia de Brasília', '2026-10-22T03:00:00.000Z', '2026-10-22'],
+    ['no fim do dia de Brasília', '2026-12-31T23:00:00.000Z', '2026-12-31'],
+  ])('%s devolve a data %s', (_label, instant, expectedDate) => {
+    expect(todayInBrasilia(new Date(instant))).toBe(expectedDate);
+  });
 });
 
 describe('toBrasiliaPeriod', () => {

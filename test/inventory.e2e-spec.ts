@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { MAX_STOCK_QUANTITY } from '../src/database/columns';
 import { InventoryUnit } from '../src/inventory-items/entities/inventory-item.entity';
 import { StockMovementResponseDto } from '../src/stock-movements/dto/stock-movement-response.dto';
 
@@ -103,16 +104,15 @@ describe('Estoque (e2e)', () => {
     inventoryItemId: string,
     type: 'inbound' | 'outbound',
     quantity: number,
+    reason = type === 'inbound' ? 'Compra' : 'Produção',
   ) {
-    return request(app.getHttpServer())
-      .post('/stock-movements')
-      .send({
-        inventoryItemId,
-        employeeId,
-        type,
-        quantity,
-        reason: type === 'inbound' ? 'Compra' : 'Produção',
-      });
+    return request(app.getHttpServer()).post('/stock-movements').send({
+      inventoryItemId,
+      employeeId,
+      type,
+      quantity,
+      reason,
+    });
   }
 
   it('cria, consulta, atualiza e remove logicamente um item', async () => {
@@ -152,6 +152,46 @@ describe('Estoque (e2e)', () => {
       .get('/inventory-items')
       .expect(200);
     expect(list.body as InventoryItemResponse[]).toEqual([]);
+  });
+
+  it('remove espaços das pontas dos textos do item', async () => {
+    const item = await createdItem({
+      name: '  Tinta preta  ',
+      category: '  Tintas  ',
+      supplierName: '  Fornecedor  ',
+    });
+
+    expect(item).toMatchObject({
+      name: 'Tinta preta',
+      category: 'Tintas',
+      supplierName: 'Fornecedor',
+    });
+  });
+
+  it.each([
+    ['nome', { name: null }],
+    ['categoria', { category: null }],
+    ['fornecedor', { supplierName: null }],
+    ['unidade', { unit: null }],
+    ['estoque mínimo', { minimumStock: null }],
+  ])('rejeita a atualização com %s nulo com 400', async (_label, body) => {
+    const item = await createdItem();
+
+    await request(app.getHttpServer())
+      .patch(`/inventory-items/${item.inventoryItemId}`)
+      .send(body)
+      .expect(400);
+
+    const stored = await request(app.getHttpServer())
+      .get(`/inventory-items/${item.inventoryItemId}`)
+      .expect(200);
+    expect(stored.body as InventoryItemResponse).toMatchObject({
+      name: 'Tinta preta',
+      category: 'Tintas',
+      supplierName: 'Fornecedor',
+      unit: 'liter',
+      minimumStock: 2,
+    });
   });
 
   it.each([
@@ -204,6 +244,46 @@ describe('Estoque (e2e)', () => {
     expect((stored.body as InventoryItemResponse).balance).toBe(2);
   });
 
+  it('aceita entrada que deixa o saldo exatamente no teto', async () => {
+    const item = await createdItem({ balance: MAX_STOCK_QUANTITY - 1 });
+
+    await moveStock(item.inventoryItemId, 'inbound', 1).expect(201);
+
+    const stored = await request(app.getHttpServer())
+      .get(`/inventory-items/${item.inventoryItemId}`)
+      .expect(200);
+    expect((stored.body as InventoryItemResponse).balance).toBe(
+      MAX_STOCK_QUANTITY,
+    );
+  });
+
+  it('rejeita entrada acima do saldo máximo sem alterar o item', async () => {
+    const item = await createdItem({ balance: MAX_STOCK_QUANTITY });
+
+    const response = await moveStock(item.inventoryItemId, 'inbound', 1).expect(
+      409,
+    );
+    expect((response.body as { message: string }).message).toBe(
+      'Saldo máximo excedido.',
+    );
+
+    const stored = await request(app.getHttpServer())
+      .get(`/inventory-items/${item.inventoryItemId}`)
+      .expect(200);
+    expect((stored.body as InventoryItemResponse).balance).toBe(
+      MAX_STOCK_QUANTITY,
+    );
+    const history = await request(app.getHttpServer())
+      .get('/stock-movements')
+      .query({
+        from: '2000-01-01',
+        to: '2999-12-31',
+        inventoryItemId: item.inventoryItemId,
+      })
+      .expect(200);
+    expect(history.body as StockMovementResponseDto[]).toEqual([]);
+  });
+
   it.each([
     ['o item', 'item'],
     ['o funcionário', 'employee'],
@@ -254,7 +334,9 @@ describe('Estoque (e2e)', () => {
 
   it('consulta movimentações em um período sem expor a senha', async () => {
     const item = await createdItem();
-    await moveStock(item.inventoryItemId, 'inbound', 1).expect(201);
+    await moveStock(item.inventoryItemId, 'inbound', 1, '  Compra  ').expect(
+      201,
+    );
     const response = await request(app.getHttpServer())
       .get('/stock-movements')
       .query({
@@ -268,7 +350,53 @@ describe('Estoque (e2e)', () => {
     expect(movements[0].employee.name).toBe('Ana');
     expect(movements[0].employee).not.toHaveProperty('passwordHash');
     expect(movements[0].quantity).toBe(1);
+    expect(movements[0].reason).toBe('Compra');
   });
+
+  it.each([
+    ['às 22h', '2026-10-02T01:00:00.000Z', '2026-10-01', '2026-10-02'],
+    ['às 23h59', '2026-10-02T02:59:59.999Z', '2026-10-01', '2026-10-02'],
+    ['à meia-noite', '2026-10-02T03:00:00.000Z', '2026-10-02', '2026-10-01'],
+  ])(
+    'associa a movimentação de %s ao dia correto em Brasília',
+    async (_label, movedAt, expectedDay, otherDay) => {
+      const item = await createdItem();
+      const movementResponse = await moveStock(
+        item.inventoryItemId,
+        'inbound',
+        1,
+      ).expect(201);
+      const movement = movementResponse.body as StockMovementResponseDto;
+      await dataSource.query(
+        'UPDATE stock_movements SET moved_at = $1 WHERE stock_movement_id = $2',
+        [movedAt, movement.stockMovementId],
+      );
+
+      const sameDay = await request(app.getHttpServer())
+        .get('/stock-movements')
+        .query({
+          from: expectedDay,
+          to: expectedDay,
+          inventoryItemId: item.inventoryItemId,
+        })
+        .expect(200);
+      expect(
+        (sameDay.body as StockMovementResponseDto[]).map(
+          (found) => found.stockMovementId,
+        ),
+      ).toEqual([movement.stockMovementId]);
+
+      const previousDay = await request(app.getHttpServer())
+        .get('/stock-movements')
+        .query({
+          from: otherDay,
+          to: otherDay,
+          inventoryItemId: item.inventoryItemId,
+        })
+        .expect(200);
+      expect(previousDay.body as StockMovementResponseDto[]).toEqual([]);
+    },
+  );
 
   it.each([
     ['com o fim antes do início', { from: '2026-02-01', to: '2026-01-01' }],
