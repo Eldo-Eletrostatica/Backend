@@ -40,6 +40,10 @@ Variáveis disponíveis (`.env.example`):
 | `S3_ACCESS_KEY_ID` | Chave de acesso ao bucket |
 | `S3_SECRET_ACCESS_KEY` | Segredo da chave de acesso |
 | `S3_PUBLIC_URL` | URL pública do bucket, usada para montar o link salvo no banco |
+| `JWT_SECRET` | Segredo HMAC-SHA256 usado para assinar e validar tokens JWT de autenticação dos funcionários |
+| `INITIAL_ADMIN_NAME` | Nome do administrador inicial provisionado no primeiro login quando ainda não há administradores |
+| `INITIAL_ADMIN_EMAIL` | E-mail do administrador inicial (padrão `admin@eldo.com.br`) |
+| `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial (padrão `Admin@123`) |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
