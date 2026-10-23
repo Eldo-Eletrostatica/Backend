@@ -3,12 +3,12 @@ import {
   IsEnum,
   IsNotEmpty,
   IsNumber,
-  IsOptional,
   IsString,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+import { IsOmittable } from '../../common/is-omittable';
 import { TrimString } from '../../common/trim-string';
 import { MAX_STOCK_QUANTITY } from '../../database/columns';
 import {
@@ -21,7 +21,7 @@ import {
 // Balance changes only through a stock movement, so it is not editable here.
 export class UpdateInventoryItemDto {
   @ApiPropertyOptional()
-  @IsOptional()
+  @IsOmittable()
   @TrimString()
   @IsString()
   @IsNotEmpty()
@@ -29,7 +29,7 @@ export class UpdateInventoryItemDto {
   name?: string;
 
   @ApiPropertyOptional()
-  @IsOptional()
+  @IsOmittable()
   @TrimString()
   @IsString()
   @IsNotEmpty()
@@ -37,7 +37,7 @@ export class UpdateInventoryItemDto {
   category?: string;
 
   @ApiPropertyOptional()
-  @IsOptional()
+  @IsOmittable()
   @TrimString()
   @IsString()
   @IsNotEmpty()
@@ -45,12 +45,12 @@ export class UpdateInventoryItemDto {
   supplierName?: string;
 
   @ApiPropertyOptional({ enum: InventoryUnit })
-  @IsOptional()
+  @IsOmittable()
   @IsEnum(InventoryUnit)
   unit?: InventoryUnit;
 
   @ApiPropertyOptional()
-  @IsOptional()
+  @IsOmittable()
   @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   @Max(MAX_STOCK_QUANTITY)
