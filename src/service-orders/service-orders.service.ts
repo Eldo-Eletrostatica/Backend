@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { todayInBrasilia } from '../common/brasilia-day';
 import { Customer, CustomerType } from '../customers/entities/customer.entity';
 import {
   Order,
@@ -49,7 +50,9 @@ export class ServiceOrdersService {
     return this.orders
       .createQueryBuilder('serviceOrder')
       .leftJoinAndSelect('serviceOrder.customer', 'customer')
-      .where('serviceOrder.due_date < CURRENT_DATE')
+      .where('serviceOrder.due_date < CAST(:today AS date)', {
+        today: todayInBrasilia(),
+      })
       .andWhere('serviceOrder.status IN (:...openStatuses)', {
         openStatuses: OPEN_SERVICE_ORDER_STATUSES,
       })

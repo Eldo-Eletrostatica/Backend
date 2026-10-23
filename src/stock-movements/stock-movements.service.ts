@@ -1,11 +1,11 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { toBrasiliaPeriod } from '../common/brasilia-day';
 import { Employee } from '../employees/entities/employee.entity';
 import { InventoryItem } from '../inventory-items/entities/inventory-item.entity';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
@@ -75,12 +75,7 @@ export class StockMovementsService {
   async findByPeriod(
     query: FindStockMovementsQueryDto,
   ): Promise<StockMovementResponseDto[]> {
-    if (query.from > query.to) {
-      throw new BadRequestException('O início deve ser anterior ao fim.');
-    }
-    const from = new Date(`${query.from}T00:00:00.000Z`);
-    const toExclusive = new Date(`${query.to}T00:00:00.000Z`);
-    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+    const { start, end } = toBrasiliaPeriod(query.from, query.to);
 
     const builder = this.stockMovements
       .createQueryBuilder('movement')
@@ -88,8 +83,8 @@ export class StockMovementsService {
       .leftJoinAndSelect('movement.inventoryItem', 'item')
       .leftJoin('movement.employee', 'employee')
       .addSelect(['employee.employeeId', 'employee.name'])
-      .where('movement.moved_at >= :from', { from })
-      .andWhere('movement.moved_at < :toExclusive', { toExclusive })
+      .where('movement.moved_at >= :start', { start })
+      .andWhere('movement.moved_at <= :end', { end })
       .orderBy('movement.moved_at', 'DESC');
     if (query.inventoryItemId !== undefined) {
       builder.andWhere('movement.inventory_item_id = :inventoryItemId', {
