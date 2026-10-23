@@ -6,6 +6,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { toBrasiliaPeriod } from '../common/brasilia-day';
+import { MAX_STOCK_QUANTITY } from '../database/columns';
 import { Employee } from '../employees/entities/employee.entity';
 import { InventoryItem } from '../inventory-items/entities/inventory-item.entity';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
@@ -55,6 +56,9 @@ export class StockMovementsService {
       );
       if (newBalance < 0) {
         throw new ConflictException('Saldo insuficiente.');
+      }
+      if (newBalance > MAX_STOCK_QUANTITY) {
+        throw new ConflictException('Saldo máximo excedido.');
       }
 
       item.balance = newBalance;
