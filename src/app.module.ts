@@ -11,10 +11,13 @@ import { EmployeesModule } from './employees/employees.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { OrdersModule } from './orders/orders.module';
 import { SalesModule } from './sales/sales.module';
+import { SalesRankingsModule } from './sales-rankings/sales-rankings.module';
 import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
 import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
+import { CommissionRulesModule } from './commission-rules/commission-rules.module';
+import { CommissionsModule } from './commissions/commissions.module';
 
 @Module({
   imports: [
@@ -40,6 +43,9 @@ import { StockMovementsModule } from './stock-movements/stock-movements.module';
     SiteSettingsModule,
     SalesModule,
     ServiceOrdersModule,
+    CommissionRulesModule,
+    CommissionsModule,
+    SalesRankingsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -20,8 +20,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
-import { UploadedImageDto } from './dto/uploaded-image.dto';
-import { MAX_IMAGE_BYTES } from './image-format';
+import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
+import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { SiteSettingsService } from './site-settings.service';
 import { VisualSettings } from './visual-settings';
 
@@ -92,5 +92,24 @@ export class SiteSettingsController {
   @ApiCreatedResponse()
   publishVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.publishVisualSettings();
+  }
+
+  @Post('visual/draft/discard')
+  @ApiOperation({
+    summary: 'Descarta o rascunho: ele volta a ser igual à versão publicada',
+  })
+  @ApiCreatedResponse()
+  discardVisualDraft(): Promise<VisualSettings> {
+    return this.siteSettingsService.discardVisualDraft();
+  }
+
+  @Post('visual/restore-default')
+  @ApiOperation({
+    summary:
+      'Restaura a identidade visual padrão no site e no rascunho, na hora',
+  })
+  @ApiCreatedResponse()
+  restoreDefaultVisualSettings(): Promise<VisualSettings> {
+    return this.siteSettingsService.restoreDefaultVisualSettings();
   }
 }

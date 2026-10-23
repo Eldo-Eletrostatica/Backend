@@ -5,23 +5,26 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`GLOSSARY.md`** at the repo root: the glossary, identical in the three repos.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. Decisions that span the three repos live in `docs/adr/` of the `Documentacao` repo (`gh api repos/Eldo-Eletrostatica/Documentacao/contents/docs/adr`).
+- **The ADRs**: they live only in `docs/adr/` of the `Documentacao` repo, never in `Backend` or `Frontend`. The "Decisões de arquitetura" section of `AGENTS.md` summarizes what each one requires. Before working on the database, a module or an integration, read the full ADR of that area: list them with `gh api repos/Eldo-Eletrostatica/Documentacao/contents/docs/adr --jq '.[].name'` and read one with `gh api repos/Eldo-Eletrostatica/Documentacao/contents/docs/adr/<file> --jq .content | base64 -d`.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+A missing `docs/adr/` in `Backend` or `Frontend` is expected: it never means there are no decisions. Don't skip the ADRs because of it.
 
 ## File structure
 
-Single-context repo:
+Single-context, with the decisions centralized in `Documentacao`:
 
 ```
-/
-├── GLOSSARY.md
-├── docs/adr/
-│   └── 0001-<decision>.md
+Documentacao/
+├── GLOSSARY.md          ← reference copy, replicated to Backend and Frontend
+└── docs/adr/
+    └── 0001-<decision>.md
+
+Backend/ and Frontend/
+├── GLOSSARY.md          ← copy
 └── src/
 ```
 
-`GLOSSARY.md` is shared by `Frontend`, `Backend` and `Documentacao`. When a term changes, update it in `Documentacao` and copy it to the other two repos.
+`GLOSSARY.md` is shared by `Frontend`, `Backend` and `Documentacao`. When a term changes, update it in `Documentacao` and copy it to the other two repos. When an ADR is created or changed, update the "Decisões de arquitetura" list in the shared block of `AGENTS.md` in the three repos.
 
 ## Use the glossary's vocabulary
 
