@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsEnum,
   IsNotEmpty,
@@ -9,12 +8,9 @@ import {
   IsUUID,
   Max,
 } from 'class-validator';
+import { TrimString } from '../../common/trim-string';
 import { MAX_STOCK_QUANTITY } from '../../database/columns';
 import { StockMovementType } from '../entities/stock-movement.entity';
-
-function trimString({ value }: TransformFnParams): unknown {
-  return typeof value === 'string' ? value.trim() : value;
-}
 
 export class CreateStockMovementDto {
   @ApiProperty()
@@ -36,7 +32,7 @@ export class CreateStockMovementDto {
   quantity: number;
 
   @ApiProperty({ example: 'Compra' })
-  @Transform(trimString)
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   reason: string;

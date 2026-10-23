@@ -1,5 +1,4 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsEnum,
   IsNotEmpty,
@@ -10,6 +9,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { TrimString } from '../../common/trim-string';
 import { MAX_STOCK_QUANTITY } from '../../database/columns';
 import {
   INVENTORY_CATEGORY_MAX_LENGTH,
@@ -18,13 +18,9 @@ import {
   SUPPLIER_NAME_MAX_LENGTH,
 } from '../entities/inventory-item.entity';
 
-function trimString({ value }: TransformFnParams): unknown {
-  return typeof value === 'string' ? value.trim() : value;
-}
-
 export class CreateInventoryItemDto {
   @ApiProperty({ example: 'Tinta epóxi preta' })
-  @Transform(trimString)
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(INVENTORY_ITEM_NAME_MAX_LENGTH)
@@ -34,7 +30,7 @@ export class CreateInventoryItemDto {
     example: 'Tintas',
     description: 'Texto livre. A categoria não é uma tabela.',
   })
-  @Transform(trimString)
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(INVENTORY_CATEGORY_MAX_LENGTH)
@@ -44,7 +40,7 @@ export class CreateInventoryItemDto {
     example: 'Tintas Brasil',
     description: 'Só o nome do fornecedor, gravado no próprio item.',
   })
-  @Transform(trimString)
+  @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(SUPPLIER_NAME_MAX_LENGTH)

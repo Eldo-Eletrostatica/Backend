@@ -7,7 +7,7 @@ import {
   TITLE_MAX_LENGTH,
 } from '../showcase-items.constants';
 import { IsOmittable } from '../../common/is-omittable';
-import { TrimString } from './trim-string.transform';
+import { TrimString } from '../../common/trim-string';
 
 export class UpdatePortfolioProjectDto {
   @ApiPropertyOptional({ maxLength: TITLE_MAX_LENGTH })
