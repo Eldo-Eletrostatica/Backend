@@ -42,6 +42,9 @@ export function priceFactorColumn(
 }
 
 // Stock amounts in kg, liters or units, with up to three decimals.
+// numeric(12, 3) leaves nine digits before the decimal point.
+export const MAX_STOCK_QUANTITY = 999_999_999.999;
+
 export function stockQuantityColumn(
   options: NumericColumnOptions = {},
 ): ColumnOptions {
