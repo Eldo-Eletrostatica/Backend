@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, In, Repository } from 'typeorm';
-import { endOfBrasiliaDay, startOfBrasiliaDay } from '../common/brasilia-day';
+import { BrasiliaPeriod, toBrasiliaPeriod } from '../common/brasilia-day';
 import { PeriodQueryDto } from '../common/dto/period-query.dto';
 import { OrderItem } from '../orders/entities/order-item.entity';
 import {
@@ -17,11 +17,6 @@ import { StatisticsResponseDto } from './dto/statistics-response.dto';
 // Contact requests are not quotes yet, and internal orders are already sales.
 export const QUOTE_SOURCES = [OrderSource.Pdf, OrderSource.Estimator];
 export const TOP_PAINT_TYPES_LIMIT = 5;
-
-interface DateTimeRange {
-  start: Date;
-  end: Date;
-}
 
 interface PaintTypeRankingRow {
   catalogItemId: string;
@@ -39,7 +34,7 @@ export class StatisticsService {
   ) {}
 
   async getStatistics(period: PeriodQueryDto): Promise<StatisticsResponseDto> {
-    const range = this.toBrasiliaRange(period);
+    const range = toBrasiliaPeriod(period.startDate, period.endDate);
 
     const [quoteCount, convertedQuoteCount, topPaintTypes] = await Promise.all([
       this.countQuotes(range),
@@ -58,18 +53,7 @@ export class StatisticsService {
     };
   }
 
-  private toBrasiliaRange(period: PeriodQueryDto): DateTimeRange {
-    const start = startOfBrasiliaDay(period.startDate);
-    const end = endOfBrasiliaDay(period.endDate);
-    if (start > end) {
-      throw new BadRequestException(
-        'A data inicial não pode ser posterior à data final.',
-      );
-    }
-    return { start, end };
-  }
-
-  private countQuotes(range: DateTimeRange): Promise<number> {
+  private countQuotes(range: BrasiliaPeriod): Promise<number> {
     return this.orderRepository.count({
       where: {
         source: In(QUOTE_SOURCES),
@@ -80,7 +64,7 @@ export class StatisticsService {
 
   // Counts the period's quotes that reached a sale, even if the sale itself
   // happened after the period: the rate measures how those quotes ended up.
-  private countConvertedQuotes(range: DateTimeRange): Promise<number> {
+  private countConvertedQuotes(range: BrasiliaPeriod): Promise<number> {
     return this.orderRepository.count({
       where: {
         source: In(QUOTE_SOURCES),
@@ -93,7 +77,7 @@ export class StatisticsService {
   // Ranks paint types by how many of the period's orders asked for them. An
   // order with several pieces of the same paint counts once.
   private async findTopPaintTypes(
-    range: DateTimeRange,
+    range: BrasiliaPeriod,
   ): Promise<PaintTypeRankingDto[]> {
     const rows = await this.orderItemRepository
       .createQueryBuilder('orderItem')

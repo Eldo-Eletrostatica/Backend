@@ -4,8 +4,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { IMAGE_CLEANUP_GRACE_PERIOD_MS } from '../src/site-settings/site-settings.service';
-import { StorageService } from '../src/storage/storage.service';
+import {
+  IMAGE_CLEANUP_GRACE_PERIOD_MS,
+  StorageService,
+} from '../src/storage/storage.service';
 import { DEFAULT_VISUAL_SETTINGS } from '../src/site-settings/visual-settings';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -108,6 +110,13 @@ describe('Configuração visual do site (e2e)', () => {
     api()
       .post('/site-settings/visual/images')
       .attach('file', content, { filename, contentType });
+
+  const uploadedUrl = async (filename: string) => {
+    const response = await uploadImage(PNG, filename, 'image/png').expect(201);
+    return (response.body as { url: string }).url;
+  };
+  const statusOf = async (url: string) =>
+    (await fetch(readableUrl(url))).status;
 
   describe('upload de imagem', () => {
     it.each([
@@ -399,15 +408,6 @@ describe('Configuração visual do site (e2e)', () => {
       expect(afterPublish.body).toEqual(draft.body);
     });
 
-    const uploadedUrl = async (filename: string) => {
-      const response = await uploadImage(PNG, filename, 'image/png').expect(
-        201,
-      );
-      return (response.body as { url: string }).url;
-    };
-    const statusOf = async (url: string) =>
-      (await fetch(readableUrl(url))).status;
-
     it('apaga o upload que não foi usado e mantém a imagem do rascunho', async () => {
       const abandonedUrl = await uploadedUrl('abandonada.png');
       const logoUrl = await uploadedUrl('logo.png');
@@ -469,6 +469,137 @@ describe('Configuração visual do site (e2e)', () => {
         .expect(201);
 
       expect(response.body).toEqual(DEFAULT_VISUAL_SETTINGS);
+    });
+  });
+
+  describe('descarte do rascunho', () => {
+    it.each([
+      ['há uma configuração publicada', { logo: { text: 'ACME' } }],
+      ['nada foi publicado', null],
+    ])(
+      'volta o rascunho a ser igual ao publicado quando %s',
+      async (_published, publishedPatch) => {
+        if (publishedPatch !== null) {
+          await api()
+            .patch('/site-settings/visual/draft')
+            .send(publishedPatch)
+            .expect(200);
+          await api().post('/site-settings/visual/publish').expect(201);
+        }
+        await api()
+          .patch('/site-settings/visual/draft')
+          .send({ colors: { accent: '#ef4444' } })
+          .expect(200);
+        const published = await api().get('/site-settings/visual').expect(200);
+
+        const discarded = await api()
+          .post('/site-settings/visual/draft/discard')
+          .expect(201);
+
+        expect(discarded.body).toEqual(published.body);
+        const draft = await api()
+          .get('/site-settings/visual/draft')
+          .expect(200);
+        expect(draft.body).toEqual(published.body);
+      },
+    );
+
+    it('apaga a imagem que só o rascunho usava e mantém a publicada', async () => {
+      const publishedLogoUrl = await uploadedUrl('logo-publicado.png');
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ logo: { imageUrl: publishedLogoUrl } })
+        .expect(200);
+      await api().post('/site-settings/visual/publish').expect(201);
+      const draftLogoUrl = await uploadedUrl('logo-rascunho.png');
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ logo: { imageUrl: draftLogoUrl } })
+        .expect(200);
+
+      await api().post('/site-settings/visual/draft/discard').expect(201);
+
+      expect(await statusOf(draftLogoUrl)).toBe(404);
+      expect(await statusOf(publishedLogoUrl)).toBe(200);
+    });
+  });
+
+  describe('restauração do padrão', () => {
+    it('volta o site público à identidade padrão na hora', async () => {
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ colors: { accent: '#22c55e' }, logo: { text: 'ACME' } })
+        .expect(200);
+      await api().post('/site-settings/visual/publish').expect(201);
+
+      const restored = await api()
+        .post('/site-settings/visual/restore-default')
+        .expect(201);
+
+      expect(restored.body).toEqual(DEFAULT_VISUAL_SETTINGS);
+      const published = await api().get('/site-settings/visual').expect(200);
+      expect(published.body).toEqual(DEFAULT_VISUAL_SETTINGS);
+    });
+
+    it.each([
+      ['uma vez', 1],
+      ['duas vezes seguidas', 2],
+    ])(
+      'descarta o rascunho não publicado ao restaurar %s',
+      async (_times, restoreCount) => {
+        await api()
+          .patch('/site-settings/visual/draft')
+          .send({ banner: { title: 'Título não publicado' } })
+          .expect(200);
+
+        for (let count = 0; count < restoreCount; count++) {
+          await api().post('/site-settings/visual/restore-default').expect(201);
+        }
+
+        const draft = await api()
+          .get('/site-settings/visual/draft')
+          .expect(200);
+        expect(draft.body).toEqual(DEFAULT_VISUAL_SETTINGS);
+      },
+    );
+
+    it('apaga do bucket as imagens publicadas e as do rascunho', async () => {
+      const publishedLogoUrl = await uploadedUrl('logo-publicado.png');
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ logo: { imageUrl: publishedLogoUrl } })
+        .expect(200);
+      await api().post('/site-settings/visual/publish').expect(201);
+      const draftBannerUrl = await uploadedUrl('banner-rascunho.png');
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ banner: { imageUrl: draftBannerUrl } })
+        .expect(200);
+
+      await api().post('/site-settings/visual/restore-default').expect(201);
+
+      expect(await statusOf(publishedLogoUrl)).toBe(404);
+      expect(await statusOf(draftBannerUrl)).toBe(404);
+    });
+  });
+
+  describe('falha do bucket ao descartar ou restaurar', () => {
+    it.each([
+      ['descarta o rascunho', '/site-settings/visual/draft/discard'],
+      ['restaura o padrão', '/site-settings/visual/restore-default'],
+    ])('%s mesmo com o bucket fora do ar', async (_action, path) => {
+      await api()
+        .patch('/site-settings/visual/draft')
+        .send({ colors: { accent: '#ef4444' } })
+        .expect(200);
+      jest
+        .spyOn(app.get(StorageService), 'deleteMany')
+        .mockRejectedValue(new Error('bucket fora do ar'));
+
+      await api().post(path).expect(201);
+
+      const draft = await api().get('/site-settings/visual/draft').expect(200);
+      expect(draft.body).toEqual(DEFAULT_VISUAL_SETTINGS);
     });
   });
 
