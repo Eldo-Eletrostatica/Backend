@@ -103,7 +103,7 @@ _Avoid_: event (sozinho, colide com os eventos do DOM e do Node)
 ### Configuração do site
 
 **VisualSettings** (configuração visual):
-Cores do tema, logotipo, banner e textos da página inicial. Tem a versão publicada, que o site mostra, e um rascunho que o administrador edita e pré-visualiza antes de publicar; pode ser restaurada para o padrão a qualquer momento.
+Cores do tema, logotipo, banner e textos da página inicial. Tem a versão publicada, que o site mostra, e um rascunho que o administrador edita e pré-visualiza antes de publicar. O rascunho pode ser descartado, voltando a ser igual à versão publicada. Restaurar o padrão volta as duas versões à identidade visual original, e o site muda na hora.
 _Avoid_: theme (sozinho), layout
 
 **Banner** (banner):
@@ -149,3 +149,15 @@ _Avoid_: salesperson, salesman, vendor
 **CommissionRule** (regra de comissão):
 Percentual ou valor fixo de comissão de um funcionário, guardado no cadastro dele. Cada funcionário tem no máximo uma regra.
 _Avoid_: bonus, fee
+
+**CommissionReport** (relatório de comissões):
+Consolidação do total de vendas e comissões apuradas por funcionário em um determinado período, utilizada pela gestão para conferência e processamento de pagamentos.
+_Avoid_: commission statement, payment report
+
+**SalesRanking** (ranking de vendas):
+Classificação dos funcionários ordenada por valor ou volume de vendas realizadas em um determinado período, utilizada pela gestão para acompanhamento de desempenho e incentivo comercial.
+_Avoid_: leaderboard, sales contest
+
+**ReportExport** (exportação de relatório):
+Arquivo gerado no formato de planilha a partir dos dados do relatório ou do ranking exibidos na tela, para download imediato.
+_Avoid_: report download, data dump
