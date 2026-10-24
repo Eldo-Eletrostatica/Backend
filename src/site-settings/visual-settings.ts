@@ -101,3 +101,8 @@ function mergeGroup<Group extends object>(
   );
   return { ...group, ...Object.fromEntries(definedEntries) };
 }
+
+// Every image field of the settings, so the cleanup never misses one.
+export function imageUrlsOf(settings: VisualSettings): (string | null)[] {
+  return [settings.logo.imageUrl, settings.banner.imageUrl];
+}

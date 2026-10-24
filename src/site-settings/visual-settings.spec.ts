@@ -1,6 +1,7 @@
 import {
   applyVisualSettingsPatch,
   DEFAULT_VISUAL_SETTINGS,
+  imageUrlsOf,
   VisualSettings,
 } from './visual-settings';
 
@@ -79,5 +80,18 @@ describe('DEFAULT_VISUAL_SETTINGS', () => {
     ['imagem do banner', DEFAULT_VISUAL_SETTINGS.banner.imageUrl, null],
   ])('usa a identidade do protótipo em %s', (_case, value, expected) => {
     expect(value).toBe(expected);
+  });
+});
+
+describe('imageUrlsOf', () => {
+  it.each([
+    [
+      'configuração com imagens',
+      CUSTOMIZED,
+      ['http://bucket/visual/logo.png', 'http://bucket/visual/banner.png'],
+    ],
+    ['identidade padrão', DEFAULT_VISUAL_SETTINGS, [null, null]],
+  ])('lista as imagens da %s', (_case, settings, expected) => {
+    expect(imageUrlsOf(settings)).toEqual(expected);
   });
 });

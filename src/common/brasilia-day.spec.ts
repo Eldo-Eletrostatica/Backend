@@ -1,4 +1,9 @@
-import { endOfBrasiliaDay, startOfBrasiliaDay } from './brasilia-day';
+import { BadRequestException } from '@nestjs/common';
+import {
+  endOfBrasiliaDay,
+  startOfBrasiliaDay,
+  toBrasiliaPeriod,
+} from './brasilia-day';
 
 describe('startOfBrasiliaDay', () => {
   it.each([
@@ -21,4 +26,27 @@ describe('endOfBrasiliaDay', () => {
       expect(endOfBrasiliaDay(date).toISOString()).toBe(expectedInstant);
     },
   );
+});
+
+describe('toBrasiliaPeriod', () => {
+  it.each([
+    ['2026-10-01', '2026-10-31'],
+    ['2026-10-15', '2026-10-15'],
+  ])('aceita o período de %s a %s', (startDate, endDate) => {
+    expect(toBrasiliaPeriod(startDate, endDate)).toEqual({
+      start: startOfBrasiliaDay(startDate),
+      end: endOfBrasiliaDay(endDate),
+    });
+  });
+
+  it.each([
+    ['2026-10-31', '2026-10-01'],
+    ['2026-12-01', '2026-11-30'],
+  ])('rejeita o período invertido de %s a %s', (startDate, endDate) => {
+    expect(() => toBrasiliaPeriod(startDate, endDate)).toThrow(
+      new BadRequestException(
+        'A data inicial não pode ser posterior à data final.',
+      ),
+    );
+  });
 });
