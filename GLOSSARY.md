@@ -150,6 +150,14 @@ _Avoid_: salesperson, salesman, vendor
 Percentual ou valor fixo de comissão de um funcionário, guardado no cadastro dele. Cada funcionário tem no máximo uma regra.
 _Avoid_: bonus, fee
 
+**Statistics** (análises estatísticas):
+Indicadores dos pedidos de um período que o gestor vê no dashboard: volume de orçamentos, taxa de conversão e tipos de pintura mais pedidos. São calculados na hora a partir de `orders` e `order_items`, sem tabela própria.
+_Avoid_: analytics, metrics, dashboard (o dashboard é a tela do Frontend)
+
+**ConversionRate** (taxa de conversão):
+Dos orçamentos criados no período, a fração que já virou venda, mesmo que a venda tenha sido fechada depois do período. Vai de 0 a 1 e fica vazia quando o período não tem orçamentos.
+_Avoid_: close rate, success rate
+
 **CommissionReport** (relatório de comissões):
 Consolidação do total de vendas e comissões apuradas por funcionário em um determinado período, utilizada pela gestão para conferência e processamento de pagamentos.
 _Avoid_: commission statement, payment report
