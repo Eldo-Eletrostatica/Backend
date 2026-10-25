@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import { StatisticsResponseDto } from '../dto/statistics-response.dto';
 import {
-  formatConversionRate,
   formatPeriod,
+  NO_CONVERSION_RATE_TEXT,
   REPORT_TITLE,
 } from './report-format';
 
 export const INDICATORS_SHEET_NAME = 'Indicadores';
 export const PAINT_TYPES_SHEET_NAME = 'Tipos de pintura';
+export const PERCENT_FORMAT = '0.00%';
 
 @Injectable()
 export class StatisticsSpreadsheetBuilder {
@@ -31,9 +32,18 @@ export class StatisticsSpreadsheetBuilder {
       [],
       ['Orçamentos', statistics.quoteCount],
       ['Viraram venda', statistics.convertedQuoteCount],
-      ['Taxa de conversão', formatConversionRate(statistics.conversionRate)],
     ]);
     sheet.getRow(1).font = { bold: true, size: 14 };
+
+    // The rate goes as a number with a percent format, so the cell can be
+    // summed, compared and charted in Excel.
+    const conversionRateRow = sheet.addRow([
+      'Taxa de conversão',
+      statistics.conversionRate ?? NO_CONVERSION_RATE_TEXT,
+    ]);
+    if (statistics.conversionRate !== null) {
+      conversionRateRow.getCell(2).numFmt = PERCENT_FORMAT;
+    }
   }
 
   private addPaintTypesSheet(

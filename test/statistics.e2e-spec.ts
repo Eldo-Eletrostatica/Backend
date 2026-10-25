@@ -346,7 +346,8 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
       const indicators = workbook.getWorksheet('Indicadores');
       const paintTypes = workbook.getWorksheet('Tipos de pintura');
       expect(indicators?.getCell('B4').value).toBe(2);
-      expect(indicators?.getCell('B6').value).toBe('50,00%');
+      expect(indicators?.getCell('B6').value).toBe(0.5);
+      expect(indicators?.getCell('B6').numFmt).toBe('0.00%');
       expect(paintTypes?.getCell('B2').value).toBe('Epóxi Teste');
     });
 
