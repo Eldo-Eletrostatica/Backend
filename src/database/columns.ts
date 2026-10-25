@@ -3,6 +3,7 @@ import { numericTransformer } from './numeric.transformer';
 
 // RFC 5321 limits a full e-mail address to 254 characters.
 export const EMAIL_MAX_LENGTH = 254;
+export const EMPLOYEE_NAME_MAX_LENGTH = 120;
 
 export const MAX_PERCENTAGE = 100;
 
@@ -42,6 +43,9 @@ export function priceFactorColumn(
 }
 
 // Stock amounts in kg, liters or units, with up to three decimals.
+// numeric(12, 3) leaves nine digits before the decimal point.
+export const MAX_STOCK_QUANTITY = 999_999_999.999;
+
 export function stockQuantityColumn(
   options: NumericColumnOptions = {},
 ): ColumnOptions {

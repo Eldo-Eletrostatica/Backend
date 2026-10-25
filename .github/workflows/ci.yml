@@ -47,6 +47,7 @@ jobs:
       S3_ACCESS_KEY_ID: eldo-dev
       S3_SECRET_ACCESS_KEY: eldo-dev-secret
       S3_PUBLIC_URL: http://localhost:8333/eldo
+      JWT_SECRET: eldo-dev-jwt-secret
 
     steps:
       - uses: actions/checkout@v4

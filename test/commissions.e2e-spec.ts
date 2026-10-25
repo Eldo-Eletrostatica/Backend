@@ -5,6 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
 import { AccumulatedCommissionsResponseDto } from '../src/commissions/dto/accumulated-commissions-response.dto';
 import {
   CommissionType,
@@ -14,6 +16,8 @@ import {
 describe('Comissões Acumuladas (e2e) - US23', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let authEmployeeId: string;
+  let authToken: string;
 
   const created = {
     employeeIds: [] as string[],
@@ -28,6 +32,21 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `auth-${randomUUID()}@eldo.com.br`;
+    const password = 'SenhaValida@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Funcionário Autenticado', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Employee],
+    );
+    authEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    authToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -52,6 +71,9 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
   });
 
   afterAll(async () => {
+    await dataSource.query(`DELETE FROM employees WHERE employee_id = $1`, [
+      authEmployeeId,
+    ]);
     await app.close();
   });
 
@@ -146,6 +168,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       const res = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -194,6 +217,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       const res = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -218,6 +242,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       const initialRes = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query(period)
         .expect(200);
 
@@ -229,6 +254,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
       const orderId = await insertApprovedOrder(2000);
       await request(app.getHttpServer())
         .post('/sales')
+        .set('Authorization', `Bearer ${authToken}`)
         .send({
           orderId,
           sellerEmployeeId: employeeId,
@@ -239,6 +265,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       const updatedRes = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query(period)
         .expect(200);
 
@@ -283,6 +310,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
         await request(app.getHttpServer())
           .get(`/employees/${employeeId}/commissions`)
+          .set('Authorization', `Bearer ${authToken}`)
           .query(query)
           .expect(400);
       },
@@ -302,6 +330,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
         const res = await request(app.getHttpServer())
           .get(`/employees/${employeeId}/commissions`)
+          .set('Authorization', `Bearer ${authToken}`)
           .query({ startDate, endDate })
           .expect(400);
 
@@ -317,6 +346,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       await request(app.getHttpServer())
         .get(`/employees/${nonExistentId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(404);
     });
@@ -331,6 +361,7 @@ describe('Comissões Acumuladas (e2e) - US23', () => {
 
       await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commissions`)
+        .set('Authorization', `Bearer ${authToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(404);
     });

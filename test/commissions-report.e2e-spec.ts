@@ -5,6 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
 import { CommissionReportResponseDto } from '../src/commissions/dto/commission-report-response.dto';
 import { SalesRankingResponseDto } from '../src/sales-rankings/dto/sales-ranking-response.dto';
 import {
@@ -15,6 +17,8 @@ import {
 describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let managerEmployeeId: string;
+  let managerToken: string;
 
   const created = {
     employeeIds: [] as string[],
@@ -29,6 +33,21 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `manager-${randomUUID()}@eldo.com.br`;
+    const password = 'ManagerPassword@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Gestor Relatórios', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Manager],
+    );
+    managerEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    managerToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -53,6 +72,9 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
   });
 
   afterAll(async () => {
+    await dataSource.query(`DELETE FROM employees WHERE employee_id = $1`, [
+      managerEmployeeId,
+    ]);
     await app.close();
   });
 
@@ -158,6 +180,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
 
       const res = await request(app.getHttpServer())
         .get('/commissions/report')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -216,6 +239,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
 
       const resValue = await request(app.getHttpServer())
         .get('/sales-rankings')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -232,6 +256,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
 
       const resVolume = await request(app.getHttpServer())
         .get('/sales-rankings')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({
           startDate: '2026-10-01',
           endDate: '2026-10-31',
@@ -258,6 +283,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
 
       const resReport = await request(app.getHttpServer())
         .get('/commissions/report/export')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -273,6 +299,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
 
       const resRanking = await request(app.getHttpServer())
         .get('/sales-rankings/export')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({ startDate: '2026-10-01', endDate: '2026-10-31' })
         .expect(200);
 
@@ -317,6 +344,7 @@ describe('Relatórios de Comissão e Ranking de Vendas (e2e) - US24', () => {
       async (endpoint, _scenario, query) => {
         await request(app.getHttpServer())
           .get(endpoint)
+          .set('Authorization', `Bearer ${managerToken}`)
           .query(query)
           .expect(400);
       },

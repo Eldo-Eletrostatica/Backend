@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 // Brazil has had no daylight saving time since 2019, so Brasília is always
 // UTC-3.
 const BRASILIA_UTC_OFFSET = '-03:00';
+const BRASILIA_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
 
 // The date is a calendar day in the YYYY-MM-DD format, already validated by
 // the DTO.
@@ -17,6 +18,13 @@ export function endOfBrasiliaDay(date: string): Date {
 export interface BrasiliaPeriod {
   start: Date;
   end: Date;
+}
+
+// The calendar day in Brasília for the given instant, in the YYYY-MM-DD
+// format.
+export function todayInBrasilia(now: Date = new Date()): string {
+  const brasiliaInstant = new Date(now.getTime() - BRASILIA_UTC_OFFSET_MS);
+  return brasiliaInstant.toISOString().slice(0, 10);
 }
 
 // Both days are whole days in Brasília time; the end day is included.
