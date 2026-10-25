@@ -74,8 +74,9 @@ export class StatisticsService {
     });
   }
 
-  // Ranks paint types by how many of the period's orders asked for them. An
-  // order with several pieces of the same paint counts once.
+  // Ranks paint types by how many of the period's orders asked for them, of
+  // any source and status: unlike the quote counts, it measures the demand
+  // for each paint. An order with several pieces of the same paint counts once.
   private async findTopPaintTypes(
     range: BrasiliaPeriod,
   ): Promise<PaintTypeRankingDto[]> {

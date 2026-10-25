@@ -151,7 +151,7 @@ Percentual ou valor fixo de comissão de um funcionário, guardado no cadastro d
 _Avoid_: bonus, fee
 
 **Statistics** (análises estatísticas):
-Indicadores dos pedidos de um período que o gestor vê no dashboard: volume de orçamentos, taxa de conversão e tipos de pintura mais pedidos. São calculados na hora a partir de `orders` e `order_items`, sem tabela própria.
+Indicadores dos pedidos de um período que o gestor vê no dashboard: volume de orçamentos, taxa de conversão e tipos de pintura mais pedidos. O volume e a taxa contam só orçamentos; o ranking de tipos de pintura conta todos os pedidos do período, de qualquer origem e status, porque mede a procura por cada pintura. São calculados na hora a partir de `orders` e `order_items`, sem tabela própria.
 _Avoid_: analytics, metrics, dashboard (o dashboard é a tela do Frontend)
 
 **ConversionRate** (taxa de conversão):

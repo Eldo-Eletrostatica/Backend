@@ -9,7 +9,8 @@ export class PaintTypeRankingDto {
 
   @ApiProperty({
     example: 15,
-    description: 'Quantidade de pedidos do período que pediram esta pintura',
+    description:
+      'Quantidade de pedidos do período que pediram esta pintura, de qualquer origem e status (inclui vendas diretas e orçamentos recusados)',
   })
   orderCount: number;
 }
