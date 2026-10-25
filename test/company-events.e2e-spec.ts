@@ -1,9 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
+import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import { IMAGE_CLEANUP_GRACE_PERIOD_MS } from '../src/storage/storage.service';
 import {
   ShowcaseItem,
@@ -37,8 +41,21 @@ function readableUrl(publicUrl: string): string {
 describe('Vitrine: eventos (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let adminEmployeeId: string;
+  let adminToken: string;
 
-  const api = () => request(app.getHttpServer());
+  const api = () => {
+    const server = request(app.getHttpServer());
+    return {
+      get: (url: string) => server.get(url),
+      post: (url: string) =>
+        server.post(url).set('Authorization', `Bearer ${adminToken}`),
+      patch: (url: string) =>
+        server.patch(url).set('Authorization', `Bearer ${adminToken}`),
+      delete: (url: string) =>
+        server.delete(url).set('Authorization', `Bearer ${adminToken}`),
+    };
+  };
 
   const uploadImage = async (): Promise<string> => {
     const response = await api()
@@ -103,12 +120,30 @@ describe('Vitrine: eventos (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `admin-${randomUUID()}@eldo.test`;
+    const password = 'AdminPassword@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Admin Eventos', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Admin],
+    );
+    adminEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    adminToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   beforeEach(cleanUp);
 
   afterAll(async () => {
     await cleanUp();
+    await dataSource.query('DELETE FROM employees WHERE employee_id = $1', [
+      adminEmployeeId,
+    ]);
     await app.close();
   });
 

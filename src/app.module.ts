@@ -4,6 +4,7 @@ import { APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { CatalogItemsModule } from './catalog-items/catalog-items.module';
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
@@ -35,6 +36,7 @@ import { StatisticsModule } from './statistics/statistics.module';
         migrationsRun: true,
       }),
     }),
+    AuthModule,
     EmployeesModule,
     CustomersModule,
     CatalogItemsModule,

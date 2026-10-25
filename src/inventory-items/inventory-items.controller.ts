@@ -9,15 +9,20 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { InventoryItem } from './entities/inventory-item.entity';
@@ -27,6 +32,9 @@ import {
 } from './inventory-items.service';
 
 @ApiTags('inventory-items')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiUnauthorizedResponse({ description: 'Não autenticado' })
 @Controller('inventory-items')
 export class InventoryItemsController {
   constructor(private readonly inventoryItemsService: InventoryItemsService) {}

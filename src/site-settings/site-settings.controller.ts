@@ -6,22 +6,30 @@ import {
   Patch,
   Post,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import { MAX_IMAGE_BYTES } from '../storage/image-format';
+import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
 import { SiteSettingsService } from './site-settings.service';
 import { VisualSettings } from './visual-settings';
 
@@ -40,18 +48,28 @@ export class SiteSettingsController {
   }
 
   @Get('visual/draft')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({ summary: 'Rascunho da configuração visual, para o editor' })
   @ApiOkResponse()
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   getDraftVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.getDraftVisualSettings();
   }
 
   @Patch('visual/draft')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Salva no rascunho só os campos enviados',
     description: 'O site público só muda quando o rascunho é publicado.',
   })
   @ApiOkResponse()
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   updateDraftVisualSettings(
     @Body() dto: UpdateVisualSettingsDto,
   ): Promise<VisualSettings> {
@@ -59,6 +77,9 @@ export class SiteSettingsController {
   }
 
   @Post('visual/images')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Envia uma imagem de logotipo ou de banner',
     description:
@@ -73,6 +94,8 @@ export class SiteSettingsController {
   })
   @ApiCreatedResponse({ type: UploadedImageDto })
   @ApiBadRequestResponse({ description: 'Sem arquivo ou formato não aceito' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiPayloadTooLargeResponse({ description: 'Imagem acima de 5 MB' })
   // The limit stops multer from buffering an oversized file in memory. Multer
   // already rejects a file that reaches the limit, hence the extra byte.
@@ -86,29 +109,44 @@ export class SiteSettingsController {
   }
 
   @Post('visual/publish')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Publica o rascunho: o site passa a usar essa configuração',
   })
   @ApiCreatedResponse()
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   publishVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.publishVisualSettings();
   }
 
   @Post('visual/draft/discard')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Descarta o rascunho: ele volta a ser igual à versão publicada',
   })
   @ApiCreatedResponse()
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   discardVisualDraft(): Promise<VisualSettings> {
     return this.siteSettingsService.discardVisualDraft();
   }
 
   @Post('visual/restore-default')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary:
       'Restaura a identidade visual padrão no site e no rascunho, na hora',
   })
   @ApiCreatedResponse()
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   restoreDefaultVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.restoreDefaultVisualSettings();
   }

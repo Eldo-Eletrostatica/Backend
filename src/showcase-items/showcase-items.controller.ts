@@ -12,21 +12,29 @@ import {
   Post,
   Query,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiBody,
   ApiConflictResponse,
   ApiConsumes,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { CompanyEventResponseDto } from './dto/company-event-response.dto';
@@ -49,6 +57,9 @@ export class ShowcaseItemsController {
   constructor(private readonly showcaseItemsService: ShowcaseItemsService) {}
 
   @Post('images')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Envia uma imagem da vitrine',
     description:
@@ -63,6 +74,8 @@ export class ShowcaseItemsController {
   })
   @ApiCreatedResponse({ type: UploadedImageDto })
   @ApiBadRequestResponse({ description: 'Sem arquivo ou formato não aceito' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiPayloadTooLargeResponse({ description: 'Imagem acima de 5 MB' })
   // Multer already rejects a file that reaches the limit, hence the extra byte.
   @UseInterceptors(
@@ -88,12 +101,17 @@ export class ShowcaseItemsController {
   }
 
   @Patch('portfolio-projects/categories/:category')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
     summary: 'Renomeia a categoria em todos os projetos dela',
     description:
       'Um nome que já existe junta as duas categorias. Devolve as categorias.',
   })
   @ApiOkResponse({ type: [String] })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Categoria não encontrada' })
   @ApiConflictResponse({ description: 'Limite de projetos ou de categorias' })
   renamePortfolioCategory(
@@ -104,10 +122,15 @@ export class ShowcaseItemsController {
   }
 
   @Delete('portfolio-projects/categories/:category')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Remove a categoria junto com todos os projetos dela',
   })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Categoria não encontrada' })
   @ApiConflictResponse({ description: 'Mínimo de categorias' })
   removePortfolioCategory(@Param('category') category: string) {
@@ -125,14 +148,24 @@ export class ShowcaseItemsController {
   }
 
   @Post('portfolio-projects')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiCreatedResponse({ type: PortfolioProjectResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiConflictResponse({ description: 'Limite de projetos ou de categorias' })
   createPortfolioProject(@Body() dto: CreatePortfolioProjectDto) {
     return this.showcaseItemsService.createPortfolioProject(dto);
   }
 
   @Patch('portfolio-projects/:showcaseItemId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOkResponse({ type: PortfolioProjectResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Projeto do portfólio não encontrado' })
   @ApiConflictResponse({ description: 'Limite de projetos ou de categorias' })
   updatePortfolioProject(
@@ -146,7 +179,12 @@ export class ShowcaseItemsController {
   }
 
   @Delete('portfolio-projects/:showcaseItemId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Projeto do portfólio não encontrado' })
   @ApiConflictResponse({ description: 'Mínimo de categorias' })
   removePortfolioProject(
@@ -172,15 +210,25 @@ export class ShowcaseItemsController {
   }
 
   @Post('company-events')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiCreatedResponse({ type: CompanyEventResponseDto })
   @ApiBadRequestResponse({ description: 'Dados inválidos' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiConflictResponse({ description: 'Máximo de eventos' })
   createCompanyEvent(@Body() dto: CreateCompanyEventDto) {
     return this.showcaseItemsService.createCompanyEvent(dto);
   }
 
   @Patch('company-events/:showcaseItemId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOkResponse({ type: CompanyEventResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   updateCompanyEvent(
     @Param('showcaseItemId', ParseUUIDPipe) showcaseItemId: string,
@@ -190,7 +238,12 @@ export class ShowcaseItemsController {
   }
 
   @Delete('company-events/:showcaseItemId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiConflictResponse({ description: 'Mínimo de eventos' })
   @ApiNotFoundResponse({ description: 'Evento não encontrado' })
   removeCompanyEvent(

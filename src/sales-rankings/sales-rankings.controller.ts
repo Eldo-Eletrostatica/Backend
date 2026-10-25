@@ -1,17 +1,31 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { GetSalesRankingQueryDto } from './dto/get-sales-ranking-query.dto';
 import { SalesRankingResponseDto } from './dto/sales-ranking-response.dto';
 import { SalesRankingsService } from './sales-rankings.service';
 
 @ApiTags('sales-rankings')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(EmployeeRole.Admin, EmployeeRole.Manager)
+@ApiUnauthorizedResponse({ description: 'Não autenticado' })
+@ApiForbiddenResponse({
+  description: 'Acesso restrito a gestores e administradores',
+})
 @Controller('sales-rankings')
 export class SalesRankingsController {
   constructor(private readonly salesRankingsService: SalesRankingsService) {}

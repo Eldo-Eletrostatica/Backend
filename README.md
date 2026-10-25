@@ -43,6 +43,10 @@ Variáveis disponíveis (`.env.example`):
 | `GOOGLE_PLACES_API_KEY` | Chave da Places API do Google Cloud, usada pela rota `/reviews`. **Ainda não existe** (ver [Avaliações do Google](#avaliações-do-google)) |
 | `GOOGLE_PLACE_ID` | Place ID da Eldo no Google, a empresa cujas avaliações aparecem no site |
 | `USE_SAMPLE_REVIEWS` | Com `true`, a rota `/reviews` devolve avaliações de exemplo no lugar das do Google. O `docker-compose.yml` liga por padrão, para o desenvolvimento rodar sem chave. Em produção, deixe `false` |
+| `JWT_SECRET` | Segredo HMAC-SHA256 usado para assinar e validar tokens JWT de autenticação dos funcionários |
+| `INITIAL_ADMIN_NAME` | Nome do administrador inicial provisionado no primeiro login quando ainda não há administradores |
+| `INITIAL_ADMIN_EMAIL` | E-mail do administrador inicial provisionado no primeiro login |
+| `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial provisionado no primeiro login |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 

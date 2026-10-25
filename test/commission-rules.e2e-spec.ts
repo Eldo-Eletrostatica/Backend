@@ -5,6 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
 import { CommissionRuleResponseDto } from '../src/commission-rules/dto/commission-rule-response.dto';
 import {
   CommissionType,
@@ -14,6 +16,7 @@ import {
 describe('Regras de Comissão (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let adminToken: string;
 
   const created = {
     employeeIds: [] as string[],
@@ -28,6 +31,22 @@ describe('Regras de Comissão (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+  });
+
+  beforeEach(async () => {
+    const password = 'AdminPassword@123';
+    const { employeeId, email } = await createTestEmployeeWithCredentials(
+      EmployeeRole.Admin,
+      password,
+    );
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    expect((loginRes.body as LoginResponseDto).employee.employeeId).toBe(
+      employeeId,
+    );
+    adminToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -55,20 +74,32 @@ describe('Regras de Comissão (e2e)', () => {
     await app.close();
   });
 
-  async function createTestEmployee(): Promise<string> {
+  async function createTestEmployeeWithCredentials(
+    role: EmployeeRole = EmployeeRole.Employee,
+    password = 'SenhaValida@123',
+  ): Promise<{ employeeId: string; email: string }> {
     const employeeId = randomUUID();
     const email = `test-${employeeId.slice(0, 8)}@eldo.com.br`;
+    const passwordHash = await hashPassword(password);
     await dataSource.query(
       `INSERT INTO employees (employee_id, name, email, password_hash, role)
-       VALUES ($1, $2, $3, 'hash', $4)`,
+       VALUES ($1, $2, $3, $4, $5)`,
       [
         employeeId,
         `Vendedor ${employeeId.slice(0, 4)}`,
         email,
-        EmployeeRole.Employee,
+        passwordHash,
+        role,
       ],
     );
     created.employeeIds.push(employeeId);
+    return { employeeId, email };
+  }
+
+  async function createTestEmployee(
+    role: EmployeeRole = EmployeeRole.Employee,
+  ): Promise<string> {
+    const { employeeId } = await createTestEmployeeWithCredentials(role);
     return employeeId;
   }
 
@@ -105,6 +136,7 @@ describe('Regras de Comissão (e2e)', () => {
 
       const res = await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Percentage,
           commissionValue: 5,
@@ -118,6 +150,7 @@ describe('Regras de Comissão (e2e)', () => {
 
       const getRes = await request(app.getHttpServer())
         .get(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       const getBody = getRes.body as CommissionRuleResponseDto;
@@ -130,6 +163,7 @@ describe('Regras de Comissão (e2e)', () => {
 
       const res = await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Fixed,
           commissionValue: 80,
@@ -147,6 +181,7 @@ describe('Regras de Comissão (e2e)', () => {
       // Primeiro define uma regra
       await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Percentage,
           commissionValue: 3,
@@ -156,6 +191,7 @@ describe('Regras de Comissão (e2e)', () => {
       // Depois limpa a regra
       const res = await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: null,
           commissionValue: null,
@@ -172,6 +208,7 @@ describe('Regras de Comissão (e2e)', () => {
       const employeeId = await createTestEmployee();
       await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Percentage,
           commissionValue: 5,
@@ -182,6 +219,7 @@ describe('Regras de Comissão (e2e)', () => {
       const orderId = await insertApprovedOrder(1000);
       const saleRes = await request(app.getHttpServer())
         .post('/sales')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           orderId,
           sellerEmployeeId: employeeId,
@@ -196,6 +234,7 @@ describe('Regras de Comissão (e2e)', () => {
       // 3. Altera a regra do vendedor para valor fixo de R$ 80,00
       await request(app.getHttpServer())
         .patch(`/employees/${employeeId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Fixed,
           commissionValue: 80,
@@ -213,6 +252,7 @@ describe('Regras de Comissão (e2e)', () => {
       const secondOrderId = await insertApprovedOrder(1000);
       const secondSaleRes = await request(app.getHttpServer())
         .post('/sales')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           orderId: secondOrderId,
           sellerEmployeeId: employeeId,
@@ -245,6 +285,7 @@ describe('Regras de Comissão (e2e)', () => {
 
         const res = await request(app.getHttpServer())
           .patch(`/employees/${employeeId}/commission-rule`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ commissionType, commissionValue })
           .expect(400);
 
@@ -267,6 +308,7 @@ describe('Regras de Comissão (e2e)', () => {
 
         const res = await request(app.getHttpServer())
           .patch(`/employees/${employeeId}/commission-rule`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ commissionType, commissionValue })
           .expect(400);
 
@@ -287,6 +329,7 @@ describe('Regras de Comissão (e2e)', () => {
 
         const res = await request(app.getHttpServer())
           .patch(`/employees/${employeeId}/commission-rule`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({
             commissionType: CommissionType.Percentage,
             commissionValue,
@@ -310,6 +353,7 @@ describe('Regras de Comissão (e2e)', () => {
 
         const res = await request(app.getHttpServer())
           .patch(`/employees/${employeeId}/commission-rule`)
+          .set('Authorization', `Bearer ${adminToken}`)
           .send({ commissionType, commissionValue })
           .expect(400);
 
@@ -323,6 +367,7 @@ describe('Regras de Comissão (e2e)', () => {
 
       await request(app.getHttpServer())
         .patch(`/employees/${nonExistentId}/commission-rule`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           commissionType: CommissionType.Fixed,
           commissionValue: 50,
