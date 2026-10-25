@@ -12,6 +12,8 @@ import {
   UNSUPPORTED_IMAGE_MESSAGE,
 } from '../storage/image-format';
 import { StorageService } from '../storage/storage.service';
+import { EstimatorSettingsDto } from './dto/estimator-settings.dto';
+import { UpdateEstimatorSettingsDto } from './dto/update-estimator-settings.dto';
 import { SiteSetting } from './entities/site-setting.entity';
 import {
   applyVisualSettingsPatch,
@@ -46,34 +48,28 @@ export class SiteSettingsService {
     return { url };
   }
 
+  async getEstimatorSettings(): Promise<EstimatorSettingsDto> {
+    return this.estimatorSettingsOf(await this.findSettings());
+  }
+
+  async updateEstimatorSettings(
+    dto: UpdateEstimatorSettingsDto,
+  ): Promise<EstimatorSettingsDto> {
+    return this.updateLockedSettings((settings) => {
+      settings.isEstimatorEnabled =
+        dto.isEnabled ?? settings.isEstimatorEnabled;
+      settings.negotiationMargin =
+        dto.negotiationMargin ?? settings.negotiationMargin;
+      return this.estimatorSettingsOf(settings);
+    });
+  }
+
   async getPublishedVisualSettings(): Promise<VisualSettings> {
     return this.publishedOf(await this.findSettings());
   }
 
   async getDraftVisualSettings(): Promise<VisualSettings> {
     return this.draftOf(await this.findSettings());
-  }
-
-  async getIsEstimatorEnabled(): Promise<boolean> {
-    return (await this.findSettings()).isEstimatorEnabled;
-  }
-
-  async toggleEstimator(enable: boolean): Promise<boolean> {
-    return this.updateLockedSettings((settings) => {
-      settings.isEstimatorEnabled = enable;
-      return enable;
-    });
-  }
-
-  async getNegotiationMargin(): Promise<number> {
-    return (await this.findSettings()).negotiationMargin;
-  }
-
-  async setNegotiationMargin(margin: number): Promise<number> {
-    return this.updateLockedSettings((settings) => {
-      settings.negotiationMargin = margin;
-      return margin;
-    });
   }
 
   async updateDraftVisualSettings(
@@ -154,6 +150,13 @@ export class SiteSettingsService {
         'Envie a imagem pela rota de upload e use a URL devolvida.',
       );
     }
+  }
+
+  private estimatorSettingsOf(settings: SiteSetting): EstimatorSettingsDto {
+    return {
+      isEnabled: settings.isEstimatorEnabled,
+      negotiationMargin: settings.negotiationMargin,
+    };
   }
 
   private publishedOf(settings: SiteSetting): VisualSettings {

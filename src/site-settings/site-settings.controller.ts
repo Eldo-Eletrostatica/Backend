@@ -27,6 +27,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EmployeeRole } from '../employees/entities/employee.entity';
+import { EstimatorSettingsDto } from './dto/estimator-settings.dto';
+import { UpdateEstimatorSettingsDto } from './dto/update-estimator-settings.dto';
 import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
@@ -151,61 +153,39 @@ export class SiteSettingsController {
     return this.siteSettingsService.restoreDefaultVisualSettings();
   }
 
-  @Patch('estimator/get')
+  @Get('estimator')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
-    summary: 'Consulta o status daferramenta de orçamento automático',
+    summary: 'Configuração do simulador de orçamento (US08)',
+    description: 'Se o simulador aparece no site e a margem de negociação.',
   })
-  @ApiOkResponse({
-    description: 'Status obtido com sucesso',
-    type: Boolean,
-  })
-  getIsEstimatorEnabled(): Promise<boolean> {
-    return this.siteSettingsService.getIsEstimatorEnabled();
+  @ApiOkResponse({ type: EstimatorSettingsDto })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
+  getEstimatorSettings(): Promise<EstimatorSettingsDto> {
+    return this.siteSettingsService.getEstimatorSettings();
   }
 
-  @Patch('estimator/disable')
+  @Patch('estimator')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
   @ApiOperation({
-    summary: 'Desabilita a ferramenta de orçamento automático',
+    summary: 'Liga ou desliga o simulador e altera a margem de negociação',
+    description:
+      'Vale na hora para o site. A margem nova só alcança os orçamentos calculados depois.',
   })
-  @ApiOkResponse({
-    description: 'Ferramenta desativada com sucesso',
+  @ApiOkResponse({ type: EstimatorSettingsDto })
+  @ApiBadRequestResponse({
+    description: 'Margem negativa, acima de 100 ou não numérica',
   })
-  disableEstimator(): Promise<boolean> {
-    return this.siteSettingsService.toggleEstimator(false);
-  }
-
-  @Patch('estimator/enable')
-  @ApiOperation({
-    summary: 'Habilita a ferramenta de orçamento automático',
-  })
-  @ApiOkResponse({
-    description: 'Ferramenta ativada com sucesso',
-  })
-  enableEstimator(): Promise<boolean> {
-    return this.siteSettingsService.toggleEstimator(true);
-  }
-
-  @Get('estimator/negotiation-margin/get')
-  @ApiOperation({
-    summary: 'Consulta a margem de negociação gerador de orçamento',
-  })
-  @ApiOkResponse({
-    description: 'Margem obtida com sucesso',
-    type: Number,
-  })
-  getNegotiationMargin(): Promise<number> {
-    return this.siteSettingsService.getNegotiationMargin();
-  }
-
-  @Patch('estimator/negotiation-margin/set')
-  @ApiOperation({
-    summary: 'Altera a margem de negociação gerador de orçamento',
-  })
-  @ApiOkResponse({
-    description: 'Margem alterada com sucesso',
-    type: Number,
-  })
-  setNegotiationMargin(@Body() margin: number): Promise<number> {
-    return this.siteSettingsService.setNegotiationMargin(margin);
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
+  updateEstimatorSettings(
+    @Body() dto: UpdateEstimatorSettingsDto,
+  ): Promise<EstimatorSettingsDto> {
+    return this.siteSettingsService.updateEstimatorSettings(dto);
   }
 }

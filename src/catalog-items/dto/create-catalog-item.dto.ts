@@ -1,33 +1,65 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CatalogItemType } from '../entities/catalog-item.entity';
-import { IsNumber, IsPositive } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Max,
+  MaxLength,
+} from 'class-validator';
+import { TrimString } from '../../common/trim-string';
+import { MAX_PRICE_FACTOR, MAX_PRICE_PER_M2 } from '../../database/columns';
+import {
+  CATALOG_ITEM_NAME_MAX_LENGTH,
+  CatalogItemType,
+} from '../entities/catalog-item.entity';
+
+// Decimal places of the columns: price_per_m2 is numeric(10,2) and
+// price_factor is numeric(6,3).
+export const PRICE_PER_M2_DECIMAL_PLACES = 2;
+export const PRICE_FACTOR_DECIMAL_PLACES = 3;
 
 export class CreateCatalogItemDto {
-  @ApiProperty({
-    example: 'paintType',
-    description: 'Tipo de item: tinta ou material',
-  })
+  @ApiProperty({ enum: CatalogItemType, example: CatalogItemType.PaintType })
+  @IsEnum(CatalogItemType)
   type: CatalogItemType;
 
-  @ApiProperty({
-    example: 'Azul Del Rey 10.006',
-    description: 'Nome da tinta ou material',
-  })
+  @ApiProperty({ example: 'Epóxi', maxLength: CATALOG_ITEM_NAME_MAX_LENGTH })
+  @TrimString()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(CATALOG_ITEM_NAME_MAX_LENGTH)
   name: string;
 
   @ApiPropertyOptional({
-    description: 'Preco por metro quadrado para tintas',
+    example: 45.5,
+    description: 'Preço por m² em reais. Só no tipo de pintura.',
   })
-  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: PRICE_PER_M2_DECIMAL_PLACES })
   @IsPositive()
-  pricePerM2: number | null;
+  @Max(MAX_PRICE_PER_M2)
+  pricePerM2?: number;
 
   @ApiPropertyOptional({
-    description: 'Fator multiplicativo para materiais',
+    example: 1.2,
+    description:
+      'Fator que multiplica o preço por m². Só no material da peça (aço 1,0; alumínio 1,2).',
   })
-  @IsNumber({ maxDecimalPlaces: 3 })
-  priceFactor: number | null;
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: PRICE_FACTOR_DECIMAL_PLACES })
+  @IsPositive()
+  @Max(MAX_PRICE_FACTOR)
+  priceFactor?: number;
 
-  @ApiProperty
-  isActive: boolean;
+  @ApiPropertyOptional({
+    default: true,
+    description: 'Inativo, o item some do simulador de orçamento.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

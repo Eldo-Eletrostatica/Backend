@@ -7,7 +7,7 @@ import { SiteSettingsService } from './site-settings.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([SiteSetting]), StorageModule],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, SiteSettingsService],
   controllers: [SiteSettingsController],
   providers: [SiteSettingsService],
 })
