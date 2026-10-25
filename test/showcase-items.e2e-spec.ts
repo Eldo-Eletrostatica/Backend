@@ -11,6 +11,9 @@ import {
 } from '../src/showcase-items/entities/showcase-item.entity';
 
 const PROJECTS_PATH = '/showcase-items/portfolio-projects';
+const CATEGORIES_PATH = `${PROJECTS_PATH}/categories`;
+const MIN_CATEGORIES = 4;
+const MAX_CATEGORIES = 6;
 const IMAGES_PATH = '/showcase-items/images';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 // Everything the suite creates carries this prefix, so the cleanup never
@@ -66,6 +69,34 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
     const response = await createProject(overrides);
     expect(response.status).toBe(201);
     return (response.body as { showcaseItemId: string }).showcaseItemId;
+  };
+
+  const categoryPath = (category: string) =>
+    `${CATEGORIES_PATH}/${encodeURIComponent(category)}`;
+
+  const countCategories = async (): Promise<number> => {
+    const [row] = await dataSource.query<{ total: number }[]>(
+      `SELECT count(DISTINCT category)::int AS total FROM showcase_items WHERE type = $1`,
+      [ShowcaseItemType.PortfolioProject],
+    );
+    return row.total;
+  };
+
+  // The category limits count every project of the database, so the tests
+  // bring the total up to what they need with one filler project per
+  // category. The fillers skip the API: their picture is not in the bucket.
+  const fillCategoriesTo = async (total: number): Promise<void> => {
+    for (let index = await countCategories(); index < total; index += 1) {
+      await dataSource.getRepository(ShowcaseItem).save({
+        type: ShowcaseItemType.PortfolioProject,
+        title: `${E2E_PREFIX}Filler ${index}`,
+        description: 'Projeto de preenchimento',
+        imageUrl: `${process.env.S3_PUBLIC_URL}/showcase/filler.png`,
+        category: `${E2E_PREFIX}Filler ${index}`,
+        serviceType: 'Pintura epóxi',
+        materials: 'Aço',
+      });
+    }
   };
 
   const statusOf = async (url: string) =>
@@ -211,6 +242,7 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
 
   describe('CRUD', () => {
     it('percorre o CRUD completo', async () => {
+      await fillCategoriesTo(MIN_CATEGORIES);
       const id = await createdId();
 
       await api().get(`${PROJECTS_PATH}/${id}`).expect(200);
@@ -226,6 +258,7 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
     });
 
     it('apaga a capa do bucket ao remover o projeto', async () => {
+      await fillCategoriesTo(MIN_CATEGORIES);
       const created = await createProject();
       const { showcaseItemId, imageUrl } = created.body as {
         showcaseItemId: string;
@@ -310,6 +343,113 @@ describe('Vitrine: projetos do portfólio (e2e)', () => {
       await api()
         .delete(`${PROJECTS_PATH}/${event.showcaseItemId}`)
         .expect(404);
+    });
+  });
+
+  describe('limites', () => {
+    it('recusa com 409 o quarto projeto de uma categoria', async () => {
+      for (let index = 0; index < 3; index += 1) {
+        await createdId();
+      }
+
+      const response = await createProject();
+
+      expect(response.status).toBe(409);
+      expect((response.body as { message: string }).message).toBe(
+        `A categoria "${CATEGORY}" já tem o máximo de 3 projetos.`,
+      );
+    });
+
+    it('recusa com 409 a troca para uma categoria cheia', async () => {
+      const full = `${E2E_PREFIX}Cheia`;
+      for (let index = 0; index < 3; index += 1) {
+        await createdId({ category: full });
+      }
+      const id = await createdId();
+
+      await api()
+        .patch(`${PROJECTS_PATH}/${id}`)
+        .send({ category: full })
+        .expect(409);
+    });
+
+    it('recusa com 409 a sétima categoria', async () => {
+      await fillCategoriesTo(MAX_CATEGORIES);
+
+      const response = await createProject({
+        category: `${E2E_PREFIX}Sétima`,
+      });
+
+      expect(response.status).toBe(409);
+      expect((response.body as { message: string }).message).toBe(
+        'O portfólio aceita no máximo 6 categorias.',
+      );
+    });
+  });
+
+  describe('categorias', () => {
+    it('renomeia a categoria em todos os projetos dela', async () => {
+      await fillCategoriesTo(MIN_CATEGORIES);
+      const ids = [await createdId(), await createdId()];
+      const newName = `${E2E_PREFIX}Portões`;
+
+      const response = await api()
+        .patch(categoryPath(CATEGORY))
+        .send({ name: `${newName} ` })
+        .expect(200);
+
+      expect(response.body as string[]).toContain(newName);
+      expect(response.body as string[]).not.toContain(CATEGORY);
+      for (const id of ids) {
+        const project = await api().get(`${PROJECTS_PATH}/${id}`).expect(200);
+        expect((project.body as { category: string }).category).toBe(newName);
+      }
+    });
+
+    it('recusa com 409 juntar duas categorias acima de 3 projetos', async () => {
+      const other = `${E2E_PREFIX}Outra`;
+      await createdId();
+      await createdId();
+      await createdId({ category: other });
+      await createdId({ category: other });
+
+      await api()
+        .patch(categoryPath(CATEGORY))
+        .send({ name: other })
+        .expect(409);
+    });
+
+    it('remove a categoria com os projetos e as capas', async () => {
+      await fillCategoriesTo(MIN_CATEGORIES);
+      const created = await createProject();
+      const { showcaseItemId, imageUrl } = created.body as {
+        showcaseItemId: string;
+        imageUrl: string;
+      };
+
+      await api().delete(categoryPath(CATEGORY)).expect(204);
+
+      await api().get(`${PROJECTS_PATH}/${showcaseItemId}`).expect(404);
+      expect(await statusOf(imageUrl)).toBe(404);
+    });
+
+    it.each([
+      ['renomear', 'patch' as const],
+      ['remover', 'delete' as const],
+    ])('devolve 404 ao %s uma categoria inexistente', async (_case, method) => {
+      await api()
+        [method](categoryPath(`${E2E_PREFIX}Inexistente`))
+        .send({ name: `${E2E_PREFIX}Nova` })
+        .expect(404);
+    });
+
+    it.each([
+      ['nome vazio', { name: '   ' }],
+      ['nome ausente', {}],
+    ])('recusa renomear com %s', async (_case, body) => {
+      await createdId();
+
+      await api().patch(categoryPath(CATEGORY)).send(body).expect(400);
     });
   });
 
