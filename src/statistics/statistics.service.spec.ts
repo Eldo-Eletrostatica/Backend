@@ -1,23 +1,28 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Between, In } from 'typeorm';
 import { OrderItem } from '../orders/entities/order-item.entity';
-import { Order } from '../orders/entities/order.entity';
-import { StatisticsService } from './statistics.service';
+import { Order, SALE_STATUSES } from '../orders/entities/order.entity';
+import { QUOTE_SOURCES, StatisticsService } from './statistics.service';
 
 const OCTOBER = { startDate: '2026-10-01', endDate: '2026-10-31' };
+// October 2026 in Brasília time (UTC-3), as toBrasiliaPeriod builds it.
+const OCTOBER_START = new Date('2026-10-01T03:00:00.000Z');
+const OCTOBER_END = new Date('2026-11-01T02:59:59.999Z');
 
 describe('StatisticsService', () => {
   let service: StatisticsService;
   let countOrders: jest.Mock;
   let getRawMany: jest.Mock;
+  let queryBuilder: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     countOrders = jest.fn();
     getRawMany = jest.fn().mockResolvedValue([]);
 
     // Every builder step returns the builder itself, like TypeORM does.
-    const queryBuilder: Record<string, jest.Mock> = { getRawMany };
+    queryBuilder = { getRawMany };
     for (const step of [
       'innerJoin',
       'withDeleted',
@@ -77,6 +82,32 @@ describe('StatisticsService', () => {
         { catalogItemId: 'polyester-id', name: 'Poliéster', orderCount: 9 },
       ],
     });
+  });
+
+  it('conta os orçamentos e as vendas só entre os orçamentos do período', async () => {
+    mockQuoteCounts(42, 13);
+
+    await service.getStatistics(OCTOBER);
+
+    const quotesInPeriod = {
+      source: In(QUOTE_SOURCES),
+      createdAt: Between(OCTOBER_START, OCTOBER_END),
+    };
+    expect(countOrders).toHaveBeenNthCalledWith(1, { where: quotesInPeriod });
+    expect(countOrders).toHaveBeenNthCalledWith(2, {
+      where: { ...quotesInPeriod, status: In(SALE_STATUSES) },
+    });
+  });
+
+  it('monta o ranking com os pedidos criados no período', async () => {
+    mockQuoteCounts(0, 0);
+
+    await service.getStatistics(OCTOBER);
+
+    expect(queryBuilder.where).toHaveBeenCalledWith(
+      'order.createdAt BETWEEN :start AND :end',
+      { start: OCTOBER_START, end: OCTOBER_END },
+    );
   });
 
   it.each([

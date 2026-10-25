@@ -13,7 +13,7 @@ import {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
 } from '../showcase-items.constants';
-import { TrimString } from './trim-string.transform';
+import { TrimString } from '../../common/trim-string';
 
 export class ListPortfolioProjectsQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
