@@ -113,14 +113,13 @@ export class SiteSettingsController {
     return this.siteSettingsService.restoreDefaultVisualSettings();
   }
 
-
   @Patch('estimator/get')
   @ApiOperation({
     summary: 'Consulta o status daferramenta de orçamento automático',
   })
   @ApiOkResponse({
     description: 'Status obtido com sucesso',
-    type: Boolean
+    type: Boolean,
   })
   getIsEstimatorEnabled(): Promise<boolean> {
     return this.siteSettingsService.getIsEstimatorEnabled();
@@ -150,27 +149,25 @@ export class SiteSettingsController {
 
   @Get('estimator/negotiation-margin/get')
   @ApiOperation({
-    summary: 'Consulta a margem de negociação gerador de orçamento'
+    summary: 'Consulta a margem de negociação gerador de orçamento',
   })
   @ApiOkResponse({
     description: 'Margem obtida com sucesso',
-    type: Number
+    type: Number,
   })
-  getNegotiationMargin(): Promise<number>
-  {
+  getNegotiationMargin(): Promise<number> {
     return this.siteSettingsService.getNegotiationMargin();
   }
 
   @Patch('estimator/negotiation-margin/set')
   @ApiOperation({
-    summary: 'Altera a margem de negociação gerador de orçamento'
+    summary: 'Altera a margem de negociação gerador de orçamento',
   })
   @ApiOkResponse({
     description: 'Margem alterada com sucesso',
-    type: Number
+    type: Number,
   })
-  setNegotiationMargin(@Body() margin : number): Promise<number>
-  {
+  setNegotiationMargin(@Body() margin: number): Promise<number> {
     return this.siteSettingsService.setNegotiationMargin(margin);
   }
 }
