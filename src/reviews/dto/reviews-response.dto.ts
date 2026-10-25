@@ -4,7 +4,7 @@ import { ReviewDto } from './review.dto';
 export class ReviewsResponseDto {
   @ApiProperty({
     description:
-      'false quando o Google está fora do ar e ainda não há avaliações guardadas; o site mostra uma mensagem no lugar da lista.',
+      'false quando o Google falhou há menos de 5 minutos, quando o limite diário de chamadas acabou ou quando falta configurar a chave; o site mostra uma mensagem no lugar da lista.',
   })
   isAvailable: boolean;
 
@@ -19,7 +19,7 @@ export class ReviewsResponseDto {
   @ApiProperty({
     type: [ReviewDto],
     description:
-      'As avaliações que o Google devolve, com qualquer nota. A Places API devolve no máximo 5.',
+      'Até 5 avaliações, com qualquer nota, na ordem de relevância definida pelo Google. As políticas do Google pedem que o site informe essa ordem, por exemplo com o título "Avaliações mais relevantes no Google".',
   })
   reviews: ReviewDto[];
 }

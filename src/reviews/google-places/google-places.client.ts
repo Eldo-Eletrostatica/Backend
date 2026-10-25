@@ -3,8 +3,11 @@
 export interface GooglePlaceReview {
   rating: number;
   text?: { text: string };
-  authorAttribution: { displayName: string };
+  // The policies require showing the author with a link to their profile.
+  authorAttribution: { displayName: string; uri?: string; photoUri?: string };
   publishTime: string;
+  // Link to this review on Google Maps, also required by the policies.
+  googleMapsUri?: string;
 }
 
 export interface GooglePlaceDetails {

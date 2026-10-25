@@ -34,8 +34,13 @@ describe('ReviewsController (e2e)', () => {
         {
           rating: 5,
           text: { text: 'Excelente' },
-          authorAttribution: { displayName: 'Maria Souza' },
+          authorAttribution: {
+            displayName: 'Maria Souza',
+            uri: 'https://www.google.com/maps/contrib/1',
+            photoUri: 'https://lh3.googleusercontent.com/a/maria',
+          },
           publishTime: '2026-09-30T14:00:00Z',
+          googleMapsUri: 'https://www.google.com/maps/reviews/1',
         },
         {
           rating: 2,
@@ -55,15 +60,21 @@ describe('ReviewsController (e2e)', () => {
         reviews: [
           {
             authorName: 'Maria Souza',
+            authorProfileUrl: 'https://www.google.com/maps/contrib/1',
+            authorPhotoUrl: 'https://lh3.googleusercontent.com/a/maria',
             rating: 5,
             comment: 'Excelente',
             publishedAt: '2026-09-30T14:00:00.000Z',
+            reviewUrl: 'https://www.google.com/maps/reviews/1',
           },
           {
             authorName: 'João Pereira',
+            authorProfileUrl: null,
+            authorPhotoUrl: null,
             rating: 2,
             comment: 'Não gostei',
             publishedAt: '2026-09-29T14:00:00.000Z',
+            reviewUrl: null,
           },
         ],
       });
