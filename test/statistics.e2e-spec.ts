@@ -165,13 +165,15 @@ describe('Dashboard de análises estatísticas (e2e) - US11', () => {
       await insertQuote('estimator', INSIDE_PERIOD);
       // Contact requests and internal orders are not quotes.
       await insertQuote('contact', INSIDE_PERIOD);
-      await insertSoldQuote('internal', INSIDE_PERIOD);
+      const internalSaleId = await insertSoldQuote('internal', INSIDE_PERIOD);
 
       // Two pieces of epoxy in the same order count as one order.
       await insertOrderItem(pdfQuoteId, epoxyId, steelId);
       await insertOrderItem(pdfQuoteId, epoxyId, steelId);
       await insertOrderItem(soldQuoteId, epoxyId, steelId);
       await insertOrderItem(estimatorQuoteId, polyesterId, steelId);
+      // The ranking counts every order, so the internal sale counts there.
+      await insertOrderItem(internalSaleId, epoxyId, steelId);
 
       const res = await getStatistics().expect(200);
 
@@ -182,7 +184,7 @@ describe('Dashboard de análises estatísticas (e2e) - US11', () => {
         convertedQuoteCount: 1,
         conversionRate: 0.25,
         topPaintTypes: [
-          { catalogItemId: epoxyId, name: 'Epóxi Teste', orderCount: 2 },
+          { catalogItemId: epoxyId, name: 'Epóxi Teste', orderCount: 3 },
           {
             catalogItemId: polyesterId,
             name: 'Poliéster Teste',
@@ -192,22 +194,50 @@ describe('Dashboard de análises estatísticas (e2e) - US11', () => {
       });
     });
 
-    it('Critério 1: um tipo de pintura desativado continua no ranking', async () => {
-      const epoxyId = await insertCatalogItem('paintType', 'Epóxi Antigo');
-      const steelId = await insertCatalogItem('partMaterial', 'Aço Teste');
-      const orderId = await insertQuote('pdf', INSIDE_PERIOD);
-      await insertOrderItem(orderId, epoxyId, steelId);
-      await dataSource.query(
-        `UPDATE catalog_items SET deleted_at = NOW() WHERE catalog_item_id = $1`,
-        [epoxyId],
-      );
+    it.each([
+      ['desativado', 'is_active = false', 1],
+      ['excluído', 'deleted_at = NOW()', 1],
+    ])(
+      'Critério 1: um tipo de pintura %s (%s) continua no ranking com %i pedido',
+      async (_, removal, expectedOrderCount) => {
+        const epoxyId = await insertCatalogItem('paintType', 'Epóxi Antigo');
+        const steelId = await insertCatalogItem('partMaterial', 'Aço Teste');
+        const orderId = await insertQuote('pdf', INSIDE_PERIOD);
+        await insertOrderItem(orderId, epoxyId, steelId);
+        await dataSource.query(
+          `UPDATE catalog_items SET ${removal} WHERE catalog_item_id = $1`,
+          [epoxyId],
+        );
 
-      const res = await getStatistics().expect(200);
+        const res = await getStatistics().expect(200);
 
-      expect((res.body as StatisticsResponseDto).topPaintTypes).toEqual([
-        { catalogItemId: epoxyId, name: 'Epóxi Antigo', orderCount: 1 },
-      ]);
-    });
+        expect((res.body as StatisticsResponseDto).topPaintTypes).toEqual([
+          {
+            catalogItemId: epoxyId,
+            name: 'Epóxi Antigo',
+            orderCount: expectedOrderCount,
+          },
+        ]);
+      },
+    );
+
+    // Brasília is UTC-3: 23h of a day in Brasília is 02h of the next day in
+    // UTC, so a UTC period would put these quotes in the wrong month.
+    it.each([
+      ['2041-04-01T02:00:00.000Z', 1],
+      ['2041-03-01T02:00:00.000Z', 0],
+    ])(
+      'Critério 2: um orçamento criado em %s conta %i vez em março, no fuso de Brasília',
+      async (createdAt, expectedQuoteCount) => {
+        await insertQuote('pdf', createdAt);
+
+        const res = await getStatistics().expect(200);
+
+        expect((res.body as StatisticsResponseDto).quoteCount).toBe(
+          expectedQuoteCount,
+        );
+      },
+    );
 
     it.each([
       [
