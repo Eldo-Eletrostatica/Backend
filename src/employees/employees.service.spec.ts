@@ -1,11 +1,16 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { verifyPassword } from '../auth/password-hash';
+import { CreateEmployeeDto } from './dto/create-employee.dto';
+import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import {
   EMAIL_IN_USE_MESSAGE,
   EMPLOYEE_NOT_FOUND_MESSAGE,
   EmployeesService,
+  LAST_ADMIN_MESSAGE,
 } from './employees.service';
 import {
   CommissionType,
@@ -16,6 +21,7 @@ import {
 describe('EmployeesService', () => {
   let service: EmployeesService;
   const mockExists = jest.fn();
+  const mockCount = jest.fn();
   const mockFindOne = jest.fn();
   const mockFind = jest.fn();
   const mockCreate = jest.fn();
@@ -24,6 +30,7 @@ describe('EmployeesService', () => {
 
   const mockEmployeeRepository = {
     exists: mockExists,
+    count: mockCount,
     findOne: mockFindOne,
     find: mockFind,
     create: mockCreate,
@@ -82,12 +89,14 @@ describe('EmployeesService', () => {
           }),
         );
 
-        const result = await service.create({
+        const dto = plainToInstance(CreateEmployeeDto, {
           name: '  Carlos Mendes ',
           email: '  CARLOS@ELDO.COM.BR ',
           password: 'Senha@123',
           role,
         });
+
+        const result = await service.create(dto);
 
         expect(result.role).toBe(role);
         expect(result.email).toBe('carlos@eldo.com.br');
@@ -116,16 +125,26 @@ describe('EmployeesService', () => {
   });
 
   describe('findAll e findOne', () => {
-    it('lista funcionários ativos convertendo commissionValue e omitindo passwordHash', async () => {
+    it('lista funcionários ativos em ordem alfabética convertendo commissionValue e omitindo passwordHash', async () => {
       mockFind.mockResolvedValue([
         sampleEmployee({
+          name: 'Ana Souza',
           commissionType: CommissionType.Percentage,
           commissionValue: 5,
+        }),
+        sampleEmployee({
+          name: 'Bruno Lima',
         }),
       ]);
 
       const list = await service.findAll();
-      expect(list).toHaveLength(1);
+      expect(mockFind).toHaveBeenCalledWith({
+        order: { name: 'ASC' },
+      });
+      expect(list.map((item) => item.name)).toEqual([
+        'Ana Souza',
+        'Bruno Lima',
+      ]);
       expect(list[0].commissionValue).toBe(5);
       expect(list[0]).not.toHaveProperty('passwordHash');
     });
@@ -139,19 +158,21 @@ describe('EmployeesService', () => {
     });
   });
 
-  describe('update', () => {
+  describe('update e remove', () => {
     it('atualiza nome, e-mail, senha e nível de permissão do funcionário', async () => {
       const existing = sampleEmployee();
       mockFindOne.mockResolvedValue(existing);
       mockExists.mockResolvedValue(false);
       mockSave.mockImplementation((emp: Employee) => Promise.resolve(emp));
 
-      const updated = await service.update(existing.employeeId, {
-        name: 'Carlos Atualizado',
-        email: 'novo@eldo.com.br',
+      const dto = plainToInstance(UpdateEmployeeDto, {
+        name: '  Carlos Atualizado ',
+        email: '  NOVO@ELDO.COM.BR ',
         password: 'NovaSenha@456',
         role: EmployeeRole.Manager,
       });
+
+      const updated = await service.update(existing.employeeId, dto);
 
       expect(updated.name).toBe('Carlos Atualizado');
       expect(updated.email).toBe('novo@eldo.com.br');
@@ -172,9 +193,7 @@ describe('EmployeesService', () => {
         }),
       ).rejects.toThrow(new ConflictException(EMAIL_IN_USE_MESSAGE));
     });
-  });
 
-  describe('remove', () => {
     it('aplica exclusão lógica via softRemove no funcionário ativo', async () => {
       const existing = sampleEmployee();
       mockFindOne.mockResolvedValue(existing);
@@ -184,5 +203,52 @@ describe('EmployeesService', () => {
 
       expect(mockSoftRemove).toHaveBeenCalledWith(existing);
     });
+
+    it.each([
+      ['remover o último administrador', 'remove', undefined],
+      [
+        'rebaixar o último administrador para manager',
+        'update',
+        EmployeeRole.Manager,
+      ],
+      [
+        'rebaixar o último administrador para employee',
+        'update',
+        EmployeeRole.Employee,
+      ],
+    ] as const)(
+      'lança ConflictException ao tentar %s (%s)',
+      async (_description, operation, targetRole) => {
+        const lastAdmin = sampleEmployee({ role: EmployeeRole.Admin });
+        mockFindOne.mockResolvedValue(lastAdmin);
+        mockCount.mockResolvedValue(1);
+
+        const action =
+          operation === 'remove'
+            ? service.remove(lastAdmin.employeeId)
+            : service.update(lastAdmin.employeeId, { role: targetRole });
+
+        await expect(action).rejects.toThrow(
+          new ConflictException(LAST_ADMIN_MESSAGE),
+        );
+        expect(mockSave).not.toHaveBeenCalled();
+        expect(mockSoftRemove).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each([
+      ['name', null],
+      ['email', null],
+      ['role', null],
+      ['password', null],
+    ] as const)(
+      'rejeita null no campo %s do UpdateEmployeeDto (%s)',
+      async (field, value) => {
+        const dto = plainToInstance(UpdateEmployeeDto, { [field]: value });
+        const errors = await validate(dto);
+
+        expect(errors.map((err) => err.property)).toContain(field);
+      },
+    );
   });
 });

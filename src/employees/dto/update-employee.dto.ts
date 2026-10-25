@@ -4,18 +4,19 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { PASSWORD_MAX_LENGTH } from '../../auth/dto/login.dto';
-import { EMAIL_MAX_LENGTH } from '../../database/columns';
-import { EmployeeRole } from '../entities/employee.entity';
+import { IsOmittable } from '../../common/is-omittable';
+import { TrimString } from '../../common/trim-string';
 import {
+  EMAIL_MAX_LENGTH,
   EMPLOYEE_NAME_MAX_LENGTH,
-  PASSWORD_MIN_LENGTH,
-} from './create-employee.dto';
+} from '../../database/columns';
+import { EmployeeRole } from '../entities/employee.entity';
+import { PASSWORD_MIN_LENGTH } from './create-employee.dto';
 
 export class UpdateEmployeeDto {
   @ApiPropertyOptional({
@@ -23,10 +24,8 @@ export class UpdateEmployeeDto {
     example: 'Carlos Mendes',
     maxLength: EMPLOYEE_NAME_MAX_LENGTH,
   })
-  @IsOptional()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @IsOmittable()
+  @TrimString()
   @IsString()
   @IsNotEmpty({ message: 'O nome não pode ser vazio.' })
   @MaxLength(EMPLOYEE_NAME_MAX_LENGTH)
@@ -37,7 +36,7 @@ export class UpdateEmployeeDto {
     example: 'carlos@eldo.com.br',
     maxLength: EMAIL_MAX_LENGTH,
   })
-  @IsOptional()
+  @IsOmittable()
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
@@ -51,7 +50,7 @@ export class UpdateEmployeeDto {
     minLength: PASSWORD_MIN_LENGTH,
     maxLength: PASSWORD_MAX_LENGTH,
   })
-  @IsOptional()
+  @IsOmittable()
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH, {
     message: `A senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres.`,
@@ -64,7 +63,7 @@ export class UpdateEmployeeDto {
     enum: EmployeeRole,
     example: EmployeeRole.Manager,
   })
-  @IsOptional()
+  @IsOmittable()
   @IsEnum(EmployeeRole, {
     message: 'Nível de permissão inválido. Use admin, manager ou employee.',
   })

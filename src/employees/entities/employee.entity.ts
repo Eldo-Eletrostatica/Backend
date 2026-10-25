@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import {
   EMAIL_MAX_LENGTH,
+  EMPLOYEE_NAME_MAX_LENGTH,
   MAX_PERCENTAGE,
   moneyColumn,
 } from '../../database/columns';
@@ -44,7 +45,7 @@ export class Employee {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'PK_employees' })
   employeeId: string;
 
-  @Column({ type: 'varchar', length: 120 })
+  @Column({ type: 'varchar', length: EMPLOYEE_NAME_MAX_LENGTH })
   name: string;
 
   // Partial index: the e-mail of a removed employee can be reused.

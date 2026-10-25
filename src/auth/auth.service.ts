@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Employee, EmployeeRole } from '../employees/entities/employee.entity';
@@ -10,34 +11,39 @@ import { hashPassword, verifyPassword } from './password-hash';
 
 export const INVALID_CREDENTIALS_MESSAGE = 'E-mail ou senha inválidos.';
 export const UNAUTHORIZED_MESSAGE = 'Autenticação necessária.';
-const DEFAULT_JWT_SECRET = 'eldo-dev-jwt-secret';
 const DEFAULT_INITIAL_ADMIN_NAME = 'Administrador Eldo';
-const DEFAULT_INITIAL_ADMIN_EMAIL = 'admin@eldo.com.br';
-const DEFAULT_INITIAL_ADMIN_PASSWORD = 'Admin@123';
+// Fixed scrypt hash verified when the email is not found, equalizing response
+// time with a wrong-password attempt so login timing cannot enumerate emails.
+const DUMMY_PASSWORD_HASH = `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`;
 
 @Injectable()
 export class AuthService {
+  private readonly jwtSecret: string;
+
   constructor(
+    private readonly config: ConfigService,
     @InjectRepository(Employee)
     private readonly employeeRepository: Repository<Employee>,
-  ) {}
+  ) {
+    this.jwtSecret = config.getOrThrow<string>('JWT_SECRET');
+  }
 
   // Returns the same generic error whether the email does not exist or the
   // password is wrong, preventing user enumeration (US09 acceptance criterion 2).
   async login(dto: LoginDto): Promise<LoginResponseDto> {
-    const email = dto.email.trim().toLowerCase();
     let employee = await this.employeeRepository.findOne({
-      where: { email },
+      where: { email: dto.email },
     });
 
     if (!employee) {
       employee = await this.provisionInitialAdminIfEligible(
-        email,
+        dto.email,
         dto.password,
       );
     }
 
     if (!employee) {
+      await verifyPassword(dto.password, DUMMY_PASSWORD_HASH);
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
@@ -56,7 +62,7 @@ export class AuthService {
         email: employee.email,
         role: employee.role,
       },
-      this.getJwtSecret(),
+      this.jwtSecret,
     );
 
     return {
@@ -68,7 +74,7 @@ export class AuthService {
   // Validates the JWT and reloads the active employee so a soft-deleted account
   // or a role change takes effect immediately on protected routes.
   async validateAccessToken(token: string): Promise<AuthenticatedEmployeeDto> {
-    const payload = verifyJwt(token, this.getJwtSecret());
+    const payload = verifyJwt(token, this.jwtSecret);
     if (!payload) {
       throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
     }
@@ -84,18 +90,20 @@ export class AuthService {
   }
 
   // Creates the initial administrator on the first login when no administrator
-  // exists yet, keeping the employees table empty for schema tests until needed.
+  // exists yet and both INITIAL_ADMIN_EMAIL and INITIAL_ADMIN_PASSWORD are set.
   private async provisionInitialAdminIfEligible(
     email: string,
     password: string,
   ): Promise<Employee | null> {
-    const initialEmail = (
-      process.env.INITIAL_ADMIN_EMAIL || DEFAULT_INITIAL_ADMIN_EMAIL
-    )
-      .trim()
+    const initialEmail = this.config
+      .get<string>('INITIAL_ADMIN_EMAIL')
+      ?.trim()
       .toLowerCase();
-    const initialPassword =
-      process.env.INITIAL_ADMIN_PASSWORD || DEFAULT_INITIAL_ADMIN_PASSWORD;
+    const initialPassword = this.config.get<string>('INITIAL_ADMIN_PASSWORD');
+
+    if (!initialEmail || !initialPassword) {
+      return null;
+    }
 
     if (email !== initialEmail || password !== initialPassword) {
       return null;
@@ -108,9 +116,9 @@ export class AuthService {
       return null;
     }
 
-    const initialName = (
-      process.env.INITIAL_ADMIN_NAME || DEFAULT_INITIAL_ADMIN_NAME
-    ).trim();
+    const initialName =
+      this.config.get<string>('INITIAL_ADMIN_NAME')?.trim() ||
+      DEFAULT_INITIAL_ADMIN_NAME;
 
     const admin = this.employeeRepository.create({
       name: initialName,
@@ -121,10 +129,6 @@ export class AuthService {
       commissionValue: null,
     });
     return this.employeeRepository.save(admin);
-  }
-
-  private getJwtSecret(): string {
-    return process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
   }
 
   private toAuthenticatedEmployee(

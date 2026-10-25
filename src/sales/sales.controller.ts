@@ -1,18 +1,24 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { LaunchSaleDto } from './dto/launch-sale.dto';
 import { SaleResponseDto } from './dto/sale-response.dto';
 import { SalesService } from './sales.service';
 
 @ApiTags('sales')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
@@ -25,6 +31,7 @@ export class SalesController {
   })
   @ApiCreatedResponse({ type: SaleResponseDto })
   @ApiBadRequestResponse({ description: 'Corpo inválido' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiNotFoundResponse({ description: 'Orçamento ou vendedor não encontrado' })
   @ApiConflictResponse({
     description: 'O orçamento já foi convertido em venda',

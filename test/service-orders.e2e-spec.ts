@@ -5,6 +5,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
+import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import {
   OrderStatus,
   SALE_STATUSES,
@@ -28,6 +31,8 @@ type ServiceOrderResponse = {
 describe('Ordens de serviço (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let authEmployeeId: string;
+  let authToken: string;
 
   const created = {
     orderIds: [] as string[],
@@ -42,6 +47,21 @@ describe('Ordens de serviço (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `manager-${randomUUID()}@eldo.test`;
+    const password = 'ManagerPassword@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Gestor OS', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Manager],
+    );
+    authEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    authToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -64,8 +84,21 @@ describe('Ordens de serviço (e2e)', () => {
   });
 
   afterAll(async () => {
+    await dataSource.query('DELETE FROM employees WHERE employee_id = $1', [
+      authEmployeeId,
+    ]);
     await app.close();
   });
+
+  const api = () => {
+    const server = request(app.getHttpServer());
+    return {
+      get: (url: string) =>
+        server.get(url).set('Authorization', `Bearer ${authToken}`),
+      patch: (url: string) =>
+        server.patch(url).set('Authorization', `Bearer ${authToken}`),
+    };
+  };
 
   function randomDocument(): string {
     return String(randomInt(0, 99_999_999)).padStart(8, '0') + '000199';
@@ -141,9 +174,7 @@ describe('Ordens de serviço (e2e)', () => {
     const serviceOrder = await insertOrder(OrderStatus.Queued);
     await insertOrder(OrderStatus.Requested);
 
-    const response = await request(app.getHttpServer())
-      .get('/service-orders')
-      .expect(200);
+    const response = await api().get('/service-orders').expect(200);
     const orders = (response.body as ServiceOrderResponse[]).filter((order) =>
       created.orderIds.includes(order.orderId),
     );
@@ -162,7 +193,7 @@ describe('Ordens de serviço (e2e)', () => {
     [OrderStatus.Finishing, OrderStatus.Queued],
   ])('aceita a mudança de %s para %s', async (from, to) => {
     const order = await insertOrder(from);
-    const response = await request(app.getHttpServer())
+    const response = await api()
       .patch(`/service-orders/${order.orderId}/status`)
       .send({ status: to })
       .expect(200);
@@ -180,7 +211,7 @@ describe('Ordens de serviço (e2e)', () => {
     ['desconhecido', 'delivered'],
   ])('rejeita status %s com 400', async (_label, status) => {
     const order = await insertOrder(OrderStatus.Queued);
-    await request(app.getHttpServer())
+    await api()
       .patch(`/service-orders/${order.orderId}/status`)
       .send({ status })
       .expect(400);
@@ -188,7 +219,7 @@ describe('Ordens de serviço (e2e)', () => {
 
   it('não trata um orçamento como ordem de serviço', async () => {
     const quote = await insertOrder(OrderStatus.Approved);
-    await request(app.getHttpServer())
+    await api()
       .patch(`/service-orders/${quote.orderId}/status`)
       .send({ status: OrderStatus.InProduction })
       .expect(404);
@@ -230,7 +261,7 @@ describe('Ordens de serviço (e2e)', () => {
       '2026-10-20',
       customerId,
     );
-    await request(app.getHttpServer())
+    await api()
       .patch(`/service-orders/${completed.orderId}/status`)
       .send({ status: OrderStatus.Completed })
       .expect(200);
@@ -262,15 +293,13 @@ describe('Ordens de serviço (e2e)', () => {
   it('lista só as OS vencidas e não concluídas', async () => {
     const overdue = await insertOrder(OrderStatus.InProduction, PAST_DUE_DATE);
     const completed = await insertOrder(OrderStatus.Queued, PAST_DUE_DATE);
-    await request(app.getHttpServer())
+    await api()
       .patch(`/service-orders/${completed.orderId}/status`)
       .send({ status: OrderStatus.Completed })
       .expect(200);
     await insertOrder(OrderStatus.Queued, FUTURE_DUE_DATE);
 
-    const response = await request(app.getHttpServer())
-      .get('/service-orders/overdue')
-      .expect(200);
+    const response = await api().get('/service-orders/overdue').expect(200);
     const ids = (response.body as ServiceOrderResponse[])
       .map((order) => order.orderId)
       .filter((orderId) => created.orderIds.includes(orderId));
@@ -300,9 +329,7 @@ describe('Ordens de serviço (e2e)', () => {
       ],
     });
     try {
-      const response = await request(app.getHttpServer())
-        .get('/service-orders/overdue')
-        .expect(200);
+      const response = await api().get('/service-orders/overdue').expect(200);
       const ids = (response.body as ServiceOrderResponse[])
         .map((order) => order.orderId)
         .filter((orderId) => created.orderIds.includes(orderId));
@@ -315,9 +342,7 @@ describe('Ordens de serviço (e2e)', () => {
 
   it('responde lista vazia quando não há atraso', async () => {
     await insertOrder(OrderStatus.Queued, FUTURE_DUE_DATE);
-    const response = await request(app.getHttpServer())
-      .get('/service-orders/overdue')
-      .expect(200);
+    const response = await api().get('/service-orders/overdue').expect(200);
     const ids = (response.body as ServiceOrderResponse[])
       .map((order) => order.orderId)
       .filter((orderId) => created.orderIds.includes(orderId));

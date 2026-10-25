@@ -5,6 +5,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
+import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import {
   OrderStatus,
   SALE_STATUSES,
@@ -33,6 +36,8 @@ interface SaleResponse {
 describe('Lançamento de venda (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let authEmployeeId: string;
+  let authToken: string;
 
   const created = {
     orderIds: [] as string[],
@@ -48,6 +53,21 @@ describe('Lançamento de venda (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `auth-${randomUUID()}@eldo.test`;
+    const password = 'SenhaValida@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Atendente', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Employee],
+    );
+    authEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    authToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   // The service commits its own transaction, so the rows created by each test
@@ -74,6 +94,9 @@ describe('Lançamento de venda (e2e)', () => {
   });
 
   afterAll(async () => {
+    await dataSource.query('DELETE FROM employees WHERE employee_id = $1', [
+      authEmployeeId,
+    ]);
     await app.close();
   });
 
@@ -132,7 +155,10 @@ describe('Lançamento de venda (e2e)', () => {
   }
 
   function launchSale(body: Record<string, unknown>) {
-    return request(app.getHttpServer()).post('/sales').send(body);
+    return request(app.getHttpServer())
+      .post('/sales')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send(body);
   }
 
   describe('a partir de um orçamento aprovado', () => {

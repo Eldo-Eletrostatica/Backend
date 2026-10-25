@@ -6,14 +6,22 @@ import {
   ParseUUIDPipe,
   Patch,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { Order } from '../orders/entities/order.entity';
 import {
   ServiceOrderProgressDto,
@@ -28,17 +36,27 @@ export class ServiceOrdersController {
   constructor(private readonly serviceOrdersService: ServiceOrdersService) {}
 
   @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Lista as ordens de serviço da equipe' })
   @ApiOkResponse({ type: [Order] })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   findAll(): Promise<Order[]> {
     return this.serviceOrdersService.findAll();
   }
 
   @Get('overdue')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin, EmployeeRole.Manager)
   @ApiOperation({
     summary: 'Lista ordens de serviço vencidas e ainda não concluídas',
   })
   @ApiOkResponse({ type: [Order] })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({
+    description: 'Acesso restrito a gestores e administradores',
+  })
   findOverdue(): Promise<Order[]> {
     return this.serviceOrdersService.findOverdue();
   }
@@ -67,11 +85,14 @@ export class ServiceOrdersController {
   }
 
   @Patch(':orderId/status')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Atualiza o status da OS, em qualquer ordem',
   })
   @ApiOkResponse({ type: Order })
   @ApiBadRequestResponse({ description: 'Status inválido' })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiNotFoundResponse({ description: 'Ordem de serviço não encontrada' })
   updateStatus(
     @Param('orderId', ParseUUIDPipe) orderId: string,

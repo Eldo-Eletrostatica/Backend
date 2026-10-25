@@ -3,6 +3,7 @@ import { numericTransformer } from './numeric.transformer';
 
 // RFC 5321 limits a full e-mail address to 254 characters.
 export const EMAIL_MAX_LENGTH = 254;
+export const EMPLOYEE_NAME_MAX_LENGTH = 120;
 
 export const MAX_PERCENTAGE = 100;
 

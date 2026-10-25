@@ -5,7 +5,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
 import { MAX_STOCK_QUANTITY } from '../src/database/columns';
+import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import { InventoryUnit } from '../src/inventory-items/entities/inventory-item.entity';
 import { StockMovementResponseDto } from '../src/stock-movements/dto/stock-movement-response.dto';
 
@@ -24,6 +27,8 @@ describe('Estoque (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let employeeId: string;
+  let authEmployeeId: string;
+  let authToken: string;
 
   const created = {
     inventoryItemIds: [] as string[],
@@ -37,6 +42,21 @@ describe('Estoque (e2e)', () => {
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
+
+    const email = `manager-${randomUUID()}@eldo.test`;
+    const password = 'ManagerPassword@123';
+    const rows = await dataSource.query<{ employee_id: string }[]>(
+      `INSERT INTO employees (name, email, password_hash, role)
+       VALUES ('Gestor Estoque', $1, $2, $3) RETURNING employee_id`,
+      [email, await hashPassword(password), EmployeeRole.Manager],
+    );
+    authEmployeeId = rows[0].employee_id;
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    authToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   beforeEach(async () => {
@@ -64,8 +84,25 @@ describe('Estoque (e2e)', () => {
   });
 
   afterAll(async () => {
+    await dataSource.query('DELETE FROM employees WHERE employee_id = $1', [
+      authEmployeeId,
+    ]);
     await app.close();
   });
+
+  const api = () => {
+    const server = request(app.getHttpServer());
+    return {
+      get: (url: string) =>
+        server.get(url).set('Authorization', `Bearer ${authToken}`),
+      post: (url: string) =>
+        server.post(url).set('Authorization', `Bearer ${authToken}`),
+      patch: (url: string) =>
+        server.patch(url).set('Authorization', `Bearer ${authToken}`),
+      delete: (url: string) =>
+        server.delete(url).set('Authorization', `Bearer ${authToken}`),
+    };
+  };
 
   async function insertEmployee(): Promise<string> {
     const rows = await dataSource.query<{ employee_id: string }[]>(
@@ -78,7 +115,7 @@ describe('Estoque (e2e)', () => {
   }
 
   function createItem(overrides: Record<string, unknown> = {}) {
-    return request(app.getHttpServer())
+    return api()
       .post('/inventory-items')
       .send({
         name: 'Tinta preta',
@@ -106,7 +143,7 @@ describe('Estoque (e2e)', () => {
     quantity: number,
     reason = type === 'inbound' ? 'Compra' : 'Produção',
   ) {
-    return request(app.getHttpServer()).post('/stock-movements').send({
+    return api().post('/stock-movements').send({
       inventoryItemId,
       employeeId,
       type,
@@ -127,12 +164,12 @@ describe('Estoque (e2e)', () => {
       hasPossibleDuplicate: false,
     });
 
-    const found = await request(app.getHttpServer())
+    const found = await api()
       .get(`/inventory-items/${createdResponse.inventoryItemId}`)
       .expect(200);
     expect((found.body as InventoryItemResponse).category).toBe('Tintas');
 
-    const updated = await request(app.getHttpServer())
+    const updated = await api()
       .patch(`/inventory-items/${createdResponse.inventoryItemId}`)
       .send({ minimumStock: 4, category: 'Insumos' })
       .expect(200);
@@ -142,15 +179,13 @@ describe('Estoque (e2e)', () => {
       supplierName: 'Fornecedor',
     });
 
-    await request(app.getHttpServer())
+    await api()
       .delete(`/inventory-items/${createdResponse.inventoryItemId}`)
       .expect(204);
-    await request(app.getHttpServer())
+    await api()
       .get(`/inventory-items/${createdResponse.inventoryItemId}`)
       .expect(404);
-    const list = await request(app.getHttpServer())
-      .get('/inventory-items')
-      .expect(200);
+    const list = await api().get('/inventory-items').expect(200);
     expect(list.body as InventoryItemResponse[]).toEqual([]);
   });
 
@@ -177,12 +212,12 @@ describe('Estoque (e2e)', () => {
   ])('rejeita a atualização com %s nulo com 400', async (_label, body) => {
     const item = await createdItem();
 
-    await request(app.getHttpServer())
+    await api()
       .patch(`/inventory-items/${item.inventoryItemId}`)
       .send(body)
       .expect(400);
 
-    const stored = await request(app.getHttpServer())
+    const stored = await api()
       .get(`/inventory-items/${item.inventoryItemId}`)
       .expect(200);
     expect(stored.body as InventoryItemResponse).toMatchObject({
@@ -222,7 +257,7 @@ describe('Estoque (e2e)', () => {
     const item = await createdItem();
     await moveStock(item.inventoryItemId, 'inbound', 3).expect(201);
     await moveStock(item.inventoryItemId, 'outbound', 4).expect(201);
-    const response = await request(app.getHttpServer())
+    const response = await api()
       .get(`/inventory-items/${item.inventoryItemId}`)
       .expect(200);
     expect((response.body as InventoryItemResponse).balance).toBe(9);
@@ -238,7 +273,7 @@ describe('Estoque (e2e)', () => {
     expect((response.body as { message: string }).message).toBe(
       'Saldo insuficiente.',
     );
-    const stored = await request(app.getHttpServer())
+    const stored = await api()
       .get(`/inventory-items/${item.inventoryItemId}`)
       .expect(200);
     expect((stored.body as InventoryItemResponse).balance).toBe(2);
@@ -249,7 +284,7 @@ describe('Estoque (e2e)', () => {
 
     await moveStock(item.inventoryItemId, 'inbound', 1).expect(201);
 
-    const stored = await request(app.getHttpServer())
+    const stored = await api()
       .get(`/inventory-items/${item.inventoryItemId}`)
       .expect(200);
     expect((stored.body as InventoryItemResponse).balance).toBe(
@@ -267,13 +302,13 @@ describe('Estoque (e2e)', () => {
       'Saldo máximo excedido.',
     );
 
-    const stored = await request(app.getHttpServer())
+    const stored = await api()
       .get(`/inventory-items/${item.inventoryItemId}`)
       .expect(200);
     expect((stored.body as InventoryItemResponse).balance).toBe(
       MAX_STOCK_QUANTITY,
     );
-    const history = await request(app.getHttpServer())
+    const history = await api()
       .get('/stock-movements')
       .query({
         from: '2000-01-01',
@@ -289,7 +324,7 @@ describe('Estoque (e2e)', () => {
     ['o funcionário', 'employee'],
   ])('responde 404 quando %s não existe', async (_label, missing) => {
     const item = await createdItem();
-    const response = await request(app.getHttpServer())
+    const response = await api()
       .post('/stock-movements')
       .send({
         inventoryItemId:
@@ -309,24 +344,20 @@ describe('Estoque (e2e)', () => {
 
   it('lista itens no limite mínimo e remove o alerta após entrada', async () => {
     const item = await createdItem({ balance: 2, minimumStock: 2 });
-    const lowStock = await request(app.getHttpServer())
-      .get('/inventory-items/low-stock')
-      .expect(200);
+    const lowStock = await api().get('/inventory-items/low-stock').expect(200);
     expect(lowStock.body as InventoryItemResponse[]).toEqual([
       expect.objectContaining({ inventoryItemId: item.inventoryItemId }),
     ]);
-    const count = await request(app.getHttpServer())
+    const count = await api()
       .get('/inventory-items/low-stock/count')
       .expect(200);
     expect((count.body as { count: number }).count).toBe(1);
 
     await moveStock(item.inventoryItemId, 'inbound', 1).expect(201);
 
-    const empty = await request(app.getHttpServer())
-      .get('/inventory-items/low-stock')
-      .expect(200);
+    const empty = await api().get('/inventory-items/low-stock').expect(200);
     expect(empty.body as InventoryItemResponse[]).toEqual([]);
-    const emptyCount = await request(app.getHttpServer())
+    const emptyCount = await api()
       .get('/inventory-items/low-stock/count')
       .expect(200);
     expect((emptyCount.body as { count: number }).count).toBe(0);
@@ -337,7 +368,7 @@ describe('Estoque (e2e)', () => {
     await moveStock(item.inventoryItemId, 'inbound', 1, '  Compra  ').expect(
       201,
     );
-    const response = await request(app.getHttpServer())
+    const response = await api()
       .get('/stock-movements')
       .query({
         from: '2000-01-01',
@@ -372,7 +403,7 @@ describe('Estoque (e2e)', () => {
         [movedAt, movement.stockMovementId],
       );
 
-      const sameDay = await request(app.getHttpServer())
+      const sameDay = await api()
         .get('/stock-movements')
         .query({
           from: expectedDay,
@@ -386,7 +417,7 @@ describe('Estoque (e2e)', () => {
         ),
       ).toEqual([movement.stockMovementId]);
 
-      const previousDay = await request(app.getHttpServer())
+      const previousDay = await api()
         .get('/stock-movements')
         .query({
           from: otherDay,
@@ -402,9 +433,6 @@ describe('Estoque (e2e)', () => {
     ['com o fim antes do início', { from: '2026-02-01', to: '2026-01-01' }],
     ['com data inválida', { from: '2026-02-31', to: '2026-03-01' }],
   ])('rejeita consulta %s com 400', async (_label, query) => {
-    await request(app.getHttpServer())
-      .get('/stock-movements')
-      .query(query)
-      .expect(400);
+    await api().get('/stock-movements').query(query).expect(400);
   });
 });

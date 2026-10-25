@@ -9,7 +9,10 @@ import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { FORBIDDEN_ROLE_MESSAGE } from '../src/auth/guards/roles.guard';
 import { hashPassword } from '../src/auth/password-hash';
 import { EmployeeResponseDto } from '../src/employees/dto/employee-response.dto';
-import { EMAIL_IN_USE_MESSAGE } from '../src/employees/employees.service';
+import {
+  EMAIL_IN_USE_MESSAGE,
+  LAST_ADMIN_MESSAGE,
+} from '../src/employees/employees.service';
 import {
   CommissionType,
   EmployeeRole,
@@ -62,6 +65,7 @@ describe('Cadastro e Permissões de Funcionários (e2e) - US10', () => {
   async function seedEmployee(
     role: EmployeeRole = EmployeeRole.Employee,
     password = 'SenhaValida@123',
+    name?: string,
   ): Promise<{ employeeId: string; email: string; password: string }> {
     const employeeId = randomUUID();
     const email = `func-${employeeId.slice(0, 8)}@eldo.com.br`;
@@ -72,7 +76,7 @@ describe('Cadastro e Permissões de Funcionários (e2e) - US10', () => {
        VALUES ($1, $2, $3, $4, $5)`,
       [
         employeeId,
-        `Funcionário ${employeeId.slice(0, 4)}`,
+        name ?? `Funcionário ${employeeId.slice(0, 4)}`,
         email,
         passwordHash,
         role,
@@ -168,6 +172,33 @@ describe('Cadastro e Permissões de Funcionários (e2e) - US10', () => {
       expect(found?.role).toBe(targetRole);
     },
   );
+
+  it('lista os funcionários ativos em ordem alfabética pelo nome', async () => {
+    const { token: adminToken } = await loginAs(EmployeeRole.Admin);
+    const zelda = await seedEmployee(
+      EmployeeRole.Employee,
+      'SenhaValida@123',
+      'Zelda Ferreira',
+    );
+    const amanda = await seedEmployee(
+      EmployeeRole.Employee,
+      'SenhaValida@123',
+      'Amanda Costa',
+    );
+
+    const listRes = await request(app.getHttpServer())
+      .get('/employees')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const list = listRes.body as EmployeeResponseDto[];
+    const seededNames = list
+      .filter((emp) =>
+        [amanda.employeeId, zelda.employeeId].includes(emp.employeeId),
+      )
+      .map((emp) => emp.name);
+    expect(seededNames).toEqual(['Amanda Costa', 'Zelda Ferreira']);
+  });
 
   it.each([
     [
@@ -317,4 +348,64 @@ describe('Cadastro e Permissões de Funcionários (e2e) - US10', () => {
       .send({ email: target.email, password: 'NovaSenha@789' })
       .expect(200);
   });
+
+  it('bloqueia com 409 a exclusão ou o rebaixamento do último administrador ativo', async () => {
+    const { token: adminToken, employeeId: adminId } = await loginAs(
+      EmployeeRole.Admin,
+    );
+    // Temporarily hides any pre-existing active admins from the development DB
+    // so `adminId` is guaranteed to be the single active administrator.
+    const otherAdmins = await dataSource.query<{ employee_id: string }[]>(
+      `UPDATE employees
+          SET deleted_at = NOW()
+        WHERE role = 'admin' AND deleted_at IS NULL AND employee_id <> $1
+        RETURNING employee_id`,
+      [adminId],
+    );
+
+    try {
+      const demoteRes = await request(app.getHttpServer())
+        .patch(`/employees/${adminId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: EmployeeRole.Employee })
+        .expect(409);
+      expect((demoteRes.body as { message: string }).message).toBe(
+        LAST_ADMIN_MESSAGE,
+      );
+
+      const deleteRes = await request(app.getHttpServer())
+        .delete(`/employees/${adminId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(409);
+      expect((deleteRes.body as { message: string }).message).toBe(
+        LAST_ADMIN_MESSAGE,
+      );
+    } finally {
+      if (otherAdmins.length > 0) {
+        await dataSource.query(
+          `UPDATE employees SET deleted_at = NULL WHERE employee_id = ANY($1)`,
+          [otherAdmins.map((row) => row.employee_id)],
+        );
+      }
+    }
+  });
+
+  it.each([
+    ['name', null],
+    ['email', null],
+    ['role', null],
+    ['password', null],
+  ] as const)(
+    'rejeita com 400 o envio de null no campo %s no PATCH (%s)',
+    async (field, value) => {
+      const { token: adminToken } = await loginAs(EmployeeRole.Admin);
+      const target = await seedEmployee(EmployeeRole.Employee);
+
+      await request(app.getHttpServer())
+        .patch(`/employees/${target.employeeId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ [field]: value })
+        .expect(400);
+    },
+  );
 });

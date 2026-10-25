@@ -9,10 +9,12 @@ import { hashPassword } from '../auth/password-hash';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { EmployeeResponseDto } from './dto/employee-response.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
-import { Employee } from './entities/employee.entity';
+import { Employee, EmployeeRole } from './entities/employee.entity';
 
 export const EMAIL_IN_USE_MESSAGE = 'Este e-mail já está em uso.';
 export const EMPLOYEE_NOT_FOUND_MESSAGE = 'Funcionário não encontrado.';
+export const LAST_ADMIN_MESSAGE =
+  'Não é possível remover ou rebaixar o último administrador ativo.';
 
 @Injectable()
 export class EmployeesService {
@@ -22,12 +24,11 @@ export class EmployeesService {
   ) {}
 
   async create(dto: CreateEmployeeDto): Promise<EmployeeResponseDto> {
-    const email = dto.email.trim().toLowerCase();
-    await this.ensureEmailAvailable(email);
+    await this.ensureEmailAvailable(dto.email);
 
     const employee = this.employeeRepository.create({
-      name: dto.name.trim(),
-      email,
+      name: dto.name,
+      email: dto.email,
       passwordHash: await hashPassword(dto.password),
       role: dto.role,
       commissionType: null,
@@ -40,7 +41,7 @@ export class EmployeesService {
 
   async findAll(): Promise<EmployeeResponseDto[]> {
     const employees = await this.employeeRepository.find({
-      order: { createdAt: 'DESC' },
+      order: { name: 'ASC' },
     });
     return employees.map((employee) => this.toResponseDto(employee));
   }
@@ -56,14 +57,21 @@ export class EmployeesService {
   ): Promise<EmployeeResponseDto> {
     const employee = await this.findActiveEmployee(employeeId);
 
+    if (
+      employee.role === EmployeeRole.Admin &&
+      dto.role !== undefined &&
+      dto.role !== EmployeeRole.Admin
+    ) {
+      await this.ensureNotLastAdmin();
+    }
+
     if (dto.email !== undefined) {
-      const normalizedEmail = dto.email.trim().toLowerCase();
-      await this.ensureEmailAvailable(normalizedEmail, employeeId);
-      employee.email = normalizedEmail;
+      await this.ensureEmailAvailable(dto.email, employeeId);
+      employee.email = dto.email;
     }
 
     if (dto.name !== undefined) {
-      employee.name = dto.name.trim();
+      employee.name = dto.name;
     }
 
     if (dto.role !== undefined) {
@@ -82,6 +90,11 @@ export class EmployeesService {
   // listings, while past sales in `orders` keep their seller reference intact.
   async remove(employeeId: string): Promise<void> {
     const employee = await this.findActiveEmployee(employeeId);
+
+    if (employee.role === EmployeeRole.Admin) {
+      await this.ensureNotLastAdmin();
+    }
+
     await this.employeeRepository.softRemove(employee);
   }
 
@@ -105,6 +118,15 @@ export class EmployeesService {
     const isEmailTaken = await this.employeeRepository.exists({ where });
     if (isEmailTaken) {
       throw new ConflictException(EMAIL_IN_USE_MESSAGE);
+    }
+  }
+
+  private async ensureNotLastAdmin(): Promise<void> {
+    const activeAdminsCount = await this.employeeRepository.count({
+      where: { role: EmployeeRole.Admin },
+    });
+    if (activeAdminsCount <= 1) {
+      throw new ConflictException(LAST_ADMIN_MESSAGE);
     }
   }
 

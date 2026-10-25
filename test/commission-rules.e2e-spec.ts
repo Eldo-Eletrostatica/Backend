@@ -5,7 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { signJwt } from '../src/auth/jwt-token';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
 import { CommissionRuleResponseDto } from '../src/commission-rules/dto/commission-rule-response.dto';
 import {
   CommissionType,
@@ -33,15 +34,19 @@ describe('Regras de Comissão (e2e)', () => {
   });
 
   beforeEach(async () => {
-    const adminId = await createTestEmployee(EmployeeRole.Admin);
-    adminToken = signJwt(
-      {
-        sub: adminId,
-        email: `admin-${adminId.slice(0, 8)}@eldo.com.br`,
-        role: EmployeeRole.Admin,
-      },
-      process.env.JWT_SECRET || 'eldo-dev-jwt-secret',
+    const password = 'AdminPassword@123';
+    const { employeeId, email } = await createTestEmployeeWithCredentials(
+      EmployeeRole.Admin,
+      password,
     );
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    expect((loginRes.body as LoginResponseDto).employee.employeeId).toBe(
+      employeeId,
+    );
+    adminToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -69,17 +74,32 @@ describe('Regras de Comissão (e2e)', () => {
     await app.close();
   });
 
+  async function createTestEmployeeWithCredentials(
+    role: EmployeeRole = EmployeeRole.Employee,
+    password = 'SenhaValida@123',
+  ): Promise<{ employeeId: string; email: string }> {
+    const employeeId = randomUUID();
+    const email = `test-${employeeId.slice(0, 8)}@eldo.com.br`;
+    const passwordHash = await hashPassword(password);
+    await dataSource.query(
+      `INSERT INTO employees (employee_id, name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        employeeId,
+        `Vendedor ${employeeId.slice(0, 4)}`,
+        email,
+        passwordHash,
+        role,
+      ],
+    );
+    created.employeeIds.push(employeeId);
+    return { employeeId, email };
+  }
+
   async function createTestEmployee(
     role: EmployeeRole = EmployeeRole.Employee,
   ): Promise<string> {
-    const employeeId = randomUUID();
-    const email = `test-${employeeId.slice(0, 8)}@eldo.com.br`;
-    await dataSource.query(
-      `INSERT INTO employees (employee_id, name, email, password_hash, role)
-       VALUES ($1, $2, $3, 'hash', $4)`,
-      [employeeId, `Vendedor ${employeeId.slice(0, 4)}`, email, role],
-    );
-    created.employeeIds.push(employeeId);
+    const { employeeId } = await createTestEmployeeWithCredentials(role);
     return employeeId;
   }
 
@@ -199,6 +219,7 @@ describe('Regras de Comissão (e2e)', () => {
       const orderId = await insertApprovedOrder(1000);
       const saleRes = await request(app.getHttpServer())
         .post('/sales')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           orderId,
           sellerEmployeeId: employeeId,
@@ -231,6 +252,7 @@ describe('Regras de Comissão (e2e)', () => {
       const secondOrderId = await insertApprovedOrder(1000);
       const secondSaleRes = await request(app.getHttpServer())
         .post('/sales')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send({
           orderId: secondOrderId,
           sellerEmployeeId: employeeId,

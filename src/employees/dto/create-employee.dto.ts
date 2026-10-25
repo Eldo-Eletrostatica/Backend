@@ -9,10 +9,13 @@ import {
   MinLength,
 } from 'class-validator';
 import { PASSWORD_MAX_LENGTH } from '../../auth/dto/login.dto';
-import { EMAIL_MAX_LENGTH } from '../../database/columns';
+import { TrimString } from '../../common/trim-string';
+import {
+  EMAIL_MAX_LENGTH,
+  EMPLOYEE_NAME_MAX_LENGTH,
+} from '../../database/columns';
 import { EmployeeRole } from '../entities/employee.entity';
 
-export const EMPLOYEE_NAME_MAX_LENGTH = 120;
 export const PASSWORD_MIN_LENGTH = 6;
 
 export class CreateEmployeeDto {
@@ -21,9 +24,7 @@ export class CreateEmployeeDto {
     example: 'Carlos Mendes',
     maxLength: EMPLOYEE_NAME_MAX_LENGTH,
   })
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @TrimString()
   @IsString()
   @IsNotEmpty({ message: 'O nome é obrigatório.' })
   @MaxLength(EMPLOYEE_NAME_MAX_LENGTH)

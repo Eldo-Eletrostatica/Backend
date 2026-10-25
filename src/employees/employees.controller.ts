@@ -63,7 +63,7 @@ export class EmployeesController {
   @ApiOperation({
     summary: 'Lista os funcionários ativos',
     description:
-      'Retorna todos os funcionários ativos (não removidos logicamente). Restrito a administradores.',
+      'Retorna todos os funcionários ativos (não removidos logicamente) em ordem alfabética. Restrito a administradores.',
   })
   @ApiOkResponse({
     description: 'Lista de funcionários ativos',
@@ -107,7 +107,10 @@ export class EmployeesController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Funcionário não encontrado' })
-  @ApiConflictResponse({ description: 'E-mail já está em uso' })
+  @ApiConflictResponse({
+    description:
+      'E-mail já está em uso ou tentativa de rebaixar o último administrador',
+  })
   update(
     @Param('employeeId', ParseUUIDPipe) employeeId: string,
     @Body() dto: UpdateEmployeeDto,
@@ -126,6 +129,9 @@ export class EmployeesController {
   @ApiUnauthorizedResponse({ description: 'Não autenticado' })
   @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   @ApiNotFoundResponse({ description: 'Funcionário não encontrado' })
+  @ApiConflictResponse({
+    description: 'Não é possível remover o último administrador ativo',
+  })
   remove(
     @Param('employeeId', ParseUUIDPipe) employeeId: string,
   ): Promise<void> {

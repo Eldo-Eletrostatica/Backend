@@ -5,22 +5,33 @@ import {
   ParseUUIDPipe,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { PeriodQueryDto } from '../common/dto/period-query.dto';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { CommissionsService } from './commissions.service';
 import { AccumulatedCommissionsResponseDto } from './dto/accumulated-commissions-response.dto';
 import { CommissionReportResponseDto } from './dto/commission-report-response.dto';
 
 @ApiTags('commissions')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiUnauthorizedResponse({ description: 'Não autenticado' })
 @Controller()
 export class CommissionsController {
   constructor(private readonly commissionsService: CommissionsService) {}
@@ -49,6 +60,7 @@ export class CommissionsController {
   }
 
   @Get('commissions/report')
+  @Roles(EmployeeRole.Admin, EmployeeRole.Manager)
   @ApiOperation({
     summary: 'Relatório consolidado de comissões por funcionário por período',
     description:
@@ -61,6 +73,9 @@ export class CommissionsController {
   @ApiBadRequestResponse({
     description: 'Parâmetros de período inválidos ou datas invertidas',
   })
+  @ApiForbiddenResponse({
+    description: 'Acesso restrito a gestores e administradores',
+  })
   getCommissionReport(
     @Query() query: PeriodQueryDto,
   ): Promise<CommissionReportResponseDto> {
@@ -68,6 +83,7 @@ export class CommissionsController {
   }
 
   @Get('commissions/report/export')
+  @Roles(EmployeeRole.Admin, EmployeeRole.Manager)
   @ApiProduces('text/csv')
   @ApiOperation({
     summary: 'Exporta o relatório consolidado de comissões em planilha CSV',
@@ -80,6 +96,9 @@ export class CommissionsController {
   })
   @ApiBadRequestResponse({
     description: 'Parâmetros de período inválidos ou datas invertidas',
+  })
+  @ApiForbiddenResponse({
+    description: 'Acesso restrito a gestores e administradores',
   })
   async exportCommissionReport(
     @Query() query: PeriodQueryDto,
