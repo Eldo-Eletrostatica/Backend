@@ -1,97 +1,100 @@
-import { HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common";
-import { Order, OrderStatus } from "./entities/order.entity";
-import { InjectRepository } from "@nestjs/typeorm";
-import { CreateOrderDto } from "./dto/create-order.dto";
-import { Repository } from "typeorm";
-import { EstimatedQuoteDto } from "./dto/estimated-quote.dto";
-import { CreateOrderItemDto } from "./dto/create-order-item.dto";
-import { OrderItem } from "./entities/order-item.entity";
-import { SiteSettingsService } from "src/site-settings/site-settings.service";
-
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Order, OrderStatus } from './entities/order.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { Repository } from 'typeorm';
+import { EstimatedQuoteDto } from './dto/estimated-quote.dto';
+import { CreateOrderItemDto } from './dto/create-order-item.dto';
+import { OrderItem } from './entities/order-item.entity';
+import { SiteSettingsService } from '../site-settings/site-settings.service';
 
 @Injectable()
 export class OrdersService {
-    constructor(
-        @InjectRepository(Order)
-        private readonly orderRepository: Repository<Order>,
-        
-        @InjectRepository(OrderItem)
-        private readonly orderItemRepository: Repository<OrderItem>,
+  constructor(
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
 
-        private readonly siteSettingsService: SiteSettingsService
-        
-    ){}
+    @InjectRepository(OrderItem)
+    private readonly orderItemRepository: Repository<OrderItem>,
 
-    async createOrder(dto: CreateOrderDto): Promise<String>{
-        const order = this.orderRepository.create({
-            customerId: dto.customerId,
-            source: dto.source,
-            customerMessage: dto.customerMessage,
-            pdfUrl: dto.pdfUrl,
-            createdAt: new Date(),
-            status: OrderStatus.Requested,
-            dueDate: dto.dueDate
-        });
+    private readonly siteSettingsService: SiteSettingsService,
+  ) {}
 
-        const saved = await this.orderRepository.save(order);
-        return saved.orderId;
-    }
+  async createOrder(dto: CreateOrderDto): Promise<string> {
+    const order = this.orderRepository.create({
+      customerId: dto.customerId,
+      source: dto.source,
+      customerMessage: dto.customerMessage,
+      pdfUrl: dto.pdfUrl,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: OrderStatus.Requested,
+      dueDate: dto.dueDate,
+    });
 
-    async createOrderItem(dto: CreateOrderItemDto): Promise<String>{
-        const orderItem = this.orderItemRepository.create({
-            orderId: dto.orderId,
-            materialCatalogItemId: dto.materialCatalogItemId,
-            paintCatalogItemId: dto.paintCatalogItemId,
-            areaM2: dto.areaM2,
-            quantity: dto.quantity,
-            pricePerM2: dto.pricePerM2,
-            priceFactor: dto.priceFactor,
-            createdAt: new Date()
-        });
+    const saved = await this.orderRepository.save(order);
+    return saved.orderId;
+  }
 
-        const saved = await this.orderItemRepository.save(orderItem);
-        return saved.orderItemId;
-    }
+  async createOrderItem(dto: CreateOrderItemDto): Promise<string> {
+    const orderItem = this.orderItemRepository.create({
+      orderId: dto.orderId,
+      materialCatalogItemId: dto.materialCatalogItemId,
+      paintCatalogItemId: dto.paintCatalogItemId,
+      areaM2: dto.areaM2,
+      quantity: dto.quantity,
+      pricePerM2: dto.pricePerM2,
+      priceFactor: dto.priceFactor,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
 
-    // Gera estimativa de orçamento
-    async estimateQuote(orderId: string): Promise<EstimatedQuoteDto> {
-        if(! this.siteSettingsService.getIsEstimatorEnabled()) throw new EstimatorNotAllowedException();
+    const saved = await this.orderItemRepository.save(orderItem);
+    return saved.orderItemId;
+  }
 
-        const order = await this.orderRepository.findOne({
-            where: { orderId }
-        });
+  // Gera estimativa de orçamento
+  async estimateQuote(orderId: string): Promise<EstimatedQuoteDto> {
+    if (!(await this.siteSettingsService.getIsEstimatorEnabled()))
+      throw new EstimatorNotAllowedException();
 
-        if(!order) throw new NotFoundException("Pedido não encontrado");
+    const order = await this.orderRepository.findOne({
+      where: { orderId },
+    });
 
-        const orderItems = await this.orderItemRepository.find({
-            where: {orderId: orderId}
-        });
+    if (!order) throw new NotFoundException('Pedido não encontrado');
 
-        let total = 0;
+    const orderItems = await this.orderItemRepository.find({
+      where: { orderId: orderId },
+    });
 
-        orderItems.forEach((item) => {
-            let itemPriceMul = 0;
+    let total = 0;
 
-            if(item.pricePerM2) itemPriceMul = item.pricePerM2;
-            else itemPriceMul = item.priceFactor;
+    orderItems.forEach((item) => {
+      total += item.areaM2 * item.pricePerM2 * item.priceFactor * item.quantity;
+    });
 
-            total += item.areaM2 * itemPriceMul * item.quantity;
-        })
+    const margin = (
+      await this.siteSettingsService.getNegotiationMargin()
+    ).valueOf();
+    const marginFactor = margin + 1;
 
-        const margin = (await this.siteSettingsService.getNegotiationMargin()).valueOf();
-        const marginFactor = margin + 1
-
-        return {
-            orderId: orderId,
-            createdAt: new Date(),
-            lowerBound: total,
-            upperBound: total * marginFactor
-        };
-    }
+    return {
+      orderId: orderId,
+      createdAt: new Date(),
+      lowerBound: total,
+      upperBound: total * marginFactor,
+    };
+  }
 }
 
 export class EstimatorNotAllowedException extends HttpException {
-    constructor(){
-        super('Estimator is not allowed', HttpStatus.METHOD_NOT_ALLOWED)
-    }
+  constructor() {
+    super('Estimator is not allowed', HttpStatus.METHOD_NOT_ALLOWED);
+  }
 }

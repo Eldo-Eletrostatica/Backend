@@ -113,26 +113,64 @@ export class SiteSettingsController {
     return this.siteSettingsService.restoreDefaultVisualSettings();
   }
 
-  @Patch('estimator/disable')
+
+  @Patch('estimator/get')
   @ApiOperation({
-    summary: 'Desabilita a ferramenta de orçamento automático'
+    summary: 'Consulta o status daferramenta de orçamento automático',
   })
   @ApiOkResponse({
-    description: 'Ferramenta desativada com sucesso'
+    description: 'Status obtido com sucesso',
+    type: Boolean
   })
-  disableEstimator(): Promise<Boolean> {
+  getIsEstimatorEnabled(): Promise<boolean> {
+    return this.siteSettingsService.getIsEstimatorEnabled();
+  }
+
+  @Patch('estimator/disable')
+  @ApiOperation({
+    summary: 'Desabilita a ferramenta de orçamento automático',
+  })
+  @ApiOkResponse({
+    description: 'Ferramenta desativada com sucesso',
+  })
+  disableEstimator(): Promise<boolean> {
     return this.siteSettingsService.toggleEstimator(false);
   }
 
   @Patch('estimator/enable')
   @ApiOperation({
-    summary: 'Habilita a ferramenta de orçamento automático'
+    summary: 'Habilita a ferramenta de orçamento automático',
   })
   @ApiOkResponse({
-    description: 'Ferramenta ativada com sucesso'
+    description: 'Ferramenta ativada com sucesso',
   })
-  enableEstimator(): Promise<Boolean> {
+  enableEstimator(): Promise<boolean> {
     return this.siteSettingsService.toggleEstimator(true);
   }
 
+  @Get('estimator/negotiation-margin/get')
+  @ApiOperation({
+    summary: 'Consulta a margem de negociação gerador de orçamento'
+  })
+  @ApiOkResponse({
+    description: 'Margem obtida com sucesso',
+    type: Number
+  })
+  getNegotiationMargin(): Promise<number>
+  {
+    return this.siteSettingsService.getNegotiationMargin();
+  }
+
+  @Patch('estimator/negotiation-margin/set')
+  @ApiOperation({
+    summary: 'Altera a margem de negociação gerador de orçamento'
+  })
+  @ApiOkResponse({
+    description: 'Margem alterada com sucesso',
+    type: Number
+  })
+  setNegotiationMargin(@Body() margin : number): Promise<number>
+  {
+    return this.siteSettingsService.setNegotiationMargin(margin);
+  }
 }
