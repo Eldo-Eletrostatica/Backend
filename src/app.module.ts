@@ -13,6 +13,7 @@ import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { OrdersModule } from './orders/orders.module';
 import { SalesModule } from './sales/sales.module';
 import { SalesRankingsModule } from './sales-rankings/sales-rankings.module';
+import { ServiceOrdersModule } from './service-orders/service-orders.module';
 import { ShowcaseItemsModule } from './showcase-items/showcase-items.module';
 import { SiteSettingsModule } from './site-settings/site-settings.module';
 import { StockMovementsModule } from './stock-movements/stock-movements.module';
@@ -43,6 +44,7 @@ import { CommissionsModule } from './commissions/commissions.module';
     ShowcaseItemsModule,
     SiteSettingsModule,
     SalesModule,
+    ServiceOrdersModule,
     CommissionRulesModule,
     CommissionsModule,
     SalesRankingsModule,

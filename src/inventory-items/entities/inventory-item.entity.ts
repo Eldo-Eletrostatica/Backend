@@ -17,6 +17,10 @@ export enum InventoryUnit {
   Unit = 'unit',
 }
 
+export const INVENTORY_ITEM_NAME_MAX_LENGTH = 150;
+export const INVENTORY_CATEGORY_MAX_LENGTH = 100;
+export const SUPPLIER_NAME_MAX_LENGTH = 150;
+
 @Entity('inventory_items')
 @Check('CHK_inventory_items_unit', enumCheck('unit', InventoryUnit))
 @Check('CHK_inventory_items_balance', '"balance" >= 0')
@@ -27,17 +31,17 @@ export class InventoryItem {
   })
   inventoryItemId: string;
 
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: INVENTORY_ITEM_NAME_MAX_LENGTH })
   name: string;
 
   // Free text typed by the staff, such as paints or supplies.
   @Index('IDX_inventory_items_category')
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: INVENTORY_CATEGORY_MAX_LENGTH })
   category: string;
 
   // Only the name: the supplier's contact would depend on the supplier, not
   // on the item, and break the third normal form.
-  @Column({ type: 'varchar', length: 150 })
+  @Column({ type: 'varchar', length: SUPPLIER_NAME_MAX_LENGTH })
   supplierName: string;
 
   @Column({ type: 'varchar', length: 20 })
