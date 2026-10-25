@@ -27,6 +27,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EmployeeRole } from '../employees/entities/employee.entity';
+import { EstimatorSettingsDto } from './dto/estimator-settings.dto';
+import { UpdateEstimatorSettingsDto } from './dto/update-estimator-settings.dto';
 import { UploadedImageDto } from '../storage/dto/uploaded-image.dto';
 import { MAX_IMAGE_BYTES } from '../storage/image-format';
 import { UpdateVisualSettingsDto } from './dto/update-visual-settings.dto';
@@ -149,5 +151,41 @@ export class SiteSettingsController {
   @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   restoreDefaultVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.restoreDefaultVisualSettings();
+  }
+
+  @Get('estimator')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
+  @ApiOperation({
+    summary: 'Configuração do simulador de orçamento (US08)',
+    description: 'Se o simulador aparece no site e a margem de negociação.',
+  })
+  @ApiOkResponse({ type: EstimatorSettingsDto })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
+  getEstimatorSettings(): Promise<EstimatorSettingsDto> {
+    return this.siteSettingsService.getEstimatorSettings();
+  }
+
+  @Patch('estimator')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(EmployeeRole.Admin)
+  @ApiOperation({
+    summary: 'Liga ou desliga o simulador e altera a margem de negociação',
+    description:
+      'Vale na hora para o site. A margem nova só alcança os orçamentos calculados depois.',
+  })
+  @ApiOkResponse({ type: EstimatorSettingsDto })
+  @ApiBadRequestResponse({
+    description: 'Margem negativa, acima de 100 ou não numérica',
+  })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
+  updateEstimatorSettings(
+    @Body() dto: UpdateEstimatorSettingsDto,
+  ): Promise<EstimatorSettingsDto> {
+    return this.siteSettingsService.updateEstimatorSettings(dto);
   }
 }

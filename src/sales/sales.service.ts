@@ -6,14 +6,10 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
-import {
-  CatalogItem,
-  CatalogItemType,
-} from '../catalog-items/entities/catalog-item.entity';
-import { Customer } from '../customers/entities/customer.entity';
+import { DataSource, EntityManager } from 'typeorm';
+import { findOrCreateCustomer } from '../common/find-or-create-customer';
+import { buildOrderItems } from '../common/order-items';
 import { Employee } from '../employees/entities/employee.entity';
-import { OrderItem } from '../orders/entities/order-item.entity';
 import {
   Order,
   OrderSource,
@@ -154,8 +150,8 @@ export class SalesService {
     manager: EntityManager,
     { customer: customerDto, items, finalPrice }: DirectSaleData,
   ): Promise<OrderToSell> {
-    const orderItems = await this.buildOrderItems(manager, items);
-    const customer = await this.findOrCreateCustomer(manager, customerDto);
+    const orderItems = await buildOrderItems(manager, items);
+    const customer = await findOrCreateCustomer(manager, customerDto);
 
     const order = await manager.save(
       manager.create(Order, {
@@ -170,73 +166,6 @@ export class SalesService {
     }
     await manager.save(orderItems);
     return { order, finalPrice };
-  }
-
-  // A document already registered is the same customer coming back.
-  private async findOrCreateCustomer(
-    manager: EntityManager,
-    dto: SaleCustomerDto,
-  ): Promise<Customer> {
-    if (dto.document !== undefined) {
-      const existing = await manager.findOne(Customer, {
-        where: { document: dto.document },
-      });
-      if (existing !== null) {
-        return existing;
-      }
-    }
-    return manager.save(manager.create(Customer, dto));
-  }
-
-  // Both foreign keys point to catalog_items, so the database cannot tell a
-  // paint type from a material: the type is checked here. The prices are
-  // copied into the item and stay frozen (ADR 0003).
-  private async buildOrderItems(
-    manager: EntityManager,
-    items: SaleItemDto[],
-  ): Promise<OrderItem[]> {
-    const catalogItemIds = items.flatMap((item) => [
-      item.materialCatalogItemId,
-      item.paintCatalogItemId,
-    ]);
-    const catalogItems = await manager.find(CatalogItem, {
-      where: { catalogItemId: In(catalogItemIds), isActive: true },
-    });
-    const catalogItemById = new Map(
-      catalogItems.map((catalogItem) => [
-        catalogItem.catalogItemId,
-        catalogItem,
-      ]),
-    );
-
-    return items.map((item) => {
-      const paint = catalogItemById.get(item.paintCatalogItemId);
-      const material = catalogItemById.get(item.materialCatalogItemId);
-      if (
-        paint?.type !== CatalogItemType.PaintType ||
-        paint.pricePerM2 === null
-      ) {
-        throw new UnprocessableEntityException(
-          'Tipo de pintura inexistente, desativado ou de outro tipo.',
-        );
-      }
-      if (
-        material?.type !== CatalogItemType.PartMaterial ||
-        material.priceFactor === null
-      ) {
-        throw new UnprocessableEntityException(
-          'Material da peça inexistente, desativado ou de outro tipo.',
-        );
-      }
-      return manager.create(OrderItem, {
-        materialCatalogItemId: item.materialCatalogItemId,
-        paintCatalogItemId: item.paintCatalogItemId,
-        areaM2: item.areaM2,
-        quantity: item.quantity,
-        pricePerM2: paint.pricePerM2,
-        priceFactor: material.priceFactor,
-      });
-    });
   }
 
   // The unique index is the last line of defense; checking first avoids

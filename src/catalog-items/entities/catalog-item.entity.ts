@@ -10,6 +10,8 @@ import {
 import { priceFactorColumn, pricePerM2Column } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
 
+export const CATALOG_ITEM_NAME_MAX_LENGTH = 100;
+
 export enum CatalogItemType {
   PaintType = 'paintType',
   PartMaterial = 'partMaterial',
@@ -34,7 +36,7 @@ export class CatalogItem {
   @Column({ type: 'varchar', length: 20 })
   type: CatalogItemType;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'varchar', length: CATALOG_ITEM_NAME_MAX_LENGTH })
   name: string;
 
   @Column(pricePerM2Column({ nullable: true }))

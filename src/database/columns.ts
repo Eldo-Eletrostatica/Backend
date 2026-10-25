@@ -28,6 +28,10 @@ export function moneyColumn(options: NumericColumnOptions = {}): ColumnOptions {
   return numericColumn(12, 2, options);
 }
 
+// Largest values of numeric(10,2) and numeric(6,3).
+export const MAX_PRICE_PER_M2 = 99_999_999.99;
+export const MAX_PRICE_FACTOR = 999.999;
+
 // Shared by the catalog item and its snapshot in the order item, so the copy
 // always fits the original value.
 export function pricePerM2Column(

@@ -12,6 +12,8 @@ import {
   UNSUPPORTED_IMAGE_MESSAGE,
 } from '../storage/image-format';
 import { StorageService } from '../storage/storage.service';
+import { EstimatorSettingsDto } from './dto/estimator-settings.dto';
+import { UpdateEstimatorSettingsDto } from './dto/update-estimator-settings.dto';
 import { SiteSetting } from './entities/site-setting.entity';
 import {
   applyVisualSettingsPatch,
@@ -44,6 +46,22 @@ export class SiteSettingsService {
       VISUAL_IMAGES_FOLDER,
     );
     return { url };
+  }
+
+  async getEstimatorSettings(): Promise<EstimatorSettingsDto> {
+    return this.estimatorSettingsOf(await this.findSettings());
+  }
+
+  async updateEstimatorSettings(
+    dto: UpdateEstimatorSettingsDto,
+  ): Promise<EstimatorSettingsDto> {
+    return this.updateLockedSettings((settings) => {
+      settings.isEstimatorEnabled =
+        dto.isEnabled ?? settings.isEstimatorEnabled;
+      settings.negotiationMargin =
+        dto.negotiationMargin ?? settings.negotiationMargin;
+      return this.estimatorSettingsOf(settings);
+    });
   }
 
   async getPublishedVisualSettings(): Promise<VisualSettings> {
@@ -132,6 +150,13 @@ export class SiteSettingsService {
         'Envie a imagem pela rota de upload e use a URL devolvida.',
       );
     }
+  }
+
+  private estimatorSettingsOf(settings: SiteSetting): EstimatorSettingsDto {
+    return {
+      isEnabled: settings.isEstimatorEnabled,
+      negotiationMargin: settings.negotiationMargin,
+    };
   }
 
   private publishedOf(settings: SiteSetting): VisualSettings {
