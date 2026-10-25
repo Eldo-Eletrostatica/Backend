@@ -45,22 +45,25 @@ describe('StatisticsController', () => {
   });
 
   it.each([
-    ['application/pdf', 'estatisticas.pdf'],
-    ['application/vnd.ms-excel', 'estatisticas.xlsx'],
+    [ExportFormat.Pdf, 'application/pdf', 'relatorio-estatisticas.pdf'],
+    [
+      ExportFormat.Xlsx,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'relatorio-estatisticas.xlsx',
+    ],
   ])(
-    'devolve o arquivo exportado como download (%s, %s)',
-    async (contentType, fileName) => {
+    'devolve o arquivo em %s como download (%s, %s)',
+    async (format, contentType, fileName) => {
       exportStatistics.mockResolvedValue({
         content: Buffer.from('arquivo'),
         contentType,
         fileName,
       });
+      const query = { startDate: '2026-10-01', endDate: '2026-10-31', format };
 
-      const file = await controller.exportStatistics({
-        startDate: '2026-10-01',
-        endDate: '2026-10-31',
-        format: ExportFormat.Pdf,
-      });
+      const file = await controller.exportStatistics(query);
+
+      expect(exportStatistics).toHaveBeenCalledWith(query);
 
       expect(file).toBeInstanceOf(StreamableFile);
       expect(file.getHeaders()).toMatchObject({
