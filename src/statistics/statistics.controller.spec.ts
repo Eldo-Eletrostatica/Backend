@@ -1,5 +1,6 @@
 import { StreamableFile } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { AuthService } from '../auth/auth.service';
 import { ExportFormat } from './dto/export-statistics-query.dto';
 import { StatisticsResponseDto } from './dto/statistics-response.dto';
 import { StatisticsController } from './statistics.controller';
@@ -27,6 +28,7 @@ describe('StatisticsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [StatisticsController],
       providers: [
+        { provide: AuthService, useValue: {} },
         { provide: StatisticsService, useValue: { getStatistics } },
         { provide: StatisticsExportService, useValue: { exportStatistics } },
       ],

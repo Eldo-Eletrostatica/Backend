@@ -6,6 +6,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
+import { hashPassword } from '../src/auth/password-hash';
+import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import { StatisticsResponseDto } from '../src/statistics/dto/statistics-response.dto';
 
 // The dashboard counts every order in the database, so the tests use a period
@@ -19,6 +22,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
   let dataSource: DataSource;
   // Every sale needs a seller (CHK_orders_sale); one is enough for the tests.
   let sellerEmployeeId: string;
+  let managerToken: string;
 
   const created = {
     orderIds: [] as string[],
@@ -35,11 +39,24 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
     dataSource = app.get(DataSource);
 
     sellerEmployeeId = randomUUID();
+    const email = `seller-${sellerEmployeeId.slice(0, 8)}@eldo.com.br`;
+    const password = 'ManagerPassword@123';
     await dataSource.query(
       `INSERT INTO employees (employee_id, name, email, password_hash, role)
-       VALUES ($1, 'Vendedor Teste', $2, 'hash', 'employee')`,
-      [sellerEmployeeId, `seller-${sellerEmployeeId.slice(0, 8)}@eldo.com.br`],
+       VALUES ($1, 'Gestor Teste', $2, $3, $4)`,
+      [
+        sellerEmployeeId,
+        email,
+        await hashPassword(password),
+        EmployeeRole.Manager,
+      ],
     );
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+    managerToken = (loginRes.body as LoginResponseDto).accessToken;
   });
 
   afterEach(async () => {
@@ -68,7 +85,10 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
   });
 
   function getStatistics(period = TEST_PERIOD) {
-    return request(app.getHttpServer()).get('/statistics').query(period);
+    return request(app.getHttpServer())
+      .get('/statistics')
+      .set('Authorization', `Bearer ${managerToken}`)
+      .query(period);
   }
 
   function randomDocument(): string {
@@ -287,6 +307,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
     ])('rejeita o período %s: %j', async (_, period) => {
       await request(app.getHttpServer())
         .get('/statistics')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query(period)
         .expect(400);
     });
@@ -308,6 +329,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
     function exportStatistics(format: string, period = TEST_PERIOD) {
       return request(app.getHttpServer())
         .get('/statistics/export')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query({ ...period, format })
         .responseType('blob');
     }
@@ -359,6 +381,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
       async (format) => {
         const res = await request(app.getHttpServer())
           .get('/statistics/export')
+          .set('Authorization', `Bearer ${managerToken}`)
           .query({ ...TEST_PERIOD, format })
           .expect(422);
 
@@ -375,6 +398,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
     ])('rejeita a exportação %s: %j', async (_, query) => {
       await request(app.getHttpServer())
         .get('/statistics/export')
+        .set('Authorization', `Bearer ${managerToken}`)
         .query(query)
         .expect(400);
     });

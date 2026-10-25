@@ -1,19 +1,39 @@
-import { Controller, Get, Query, StreamableFile } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  StreamableFile,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
   ApiTags,
+  ApiUnauthorizedResponse,
   ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { PeriodQueryDto } from '../common/dto/period-query.dto';
+import { EmployeeRole } from '../employees/entities/employee.entity';
 import { ExportStatisticsQueryDto } from './dto/export-statistics-query.dto';
 import { StatisticsResponseDto } from './dto/statistics-response.dto';
 import { StatisticsExportService } from './statistics-export.service';
 import { StatisticsService } from './statistics.service';
 
 @ApiTags('statistics')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(EmployeeRole.Admin, EmployeeRole.Manager)
+@ApiUnauthorizedResponse({ description: 'Não autenticado' })
+@ApiForbiddenResponse({
+  description: 'Acesso restrito a gestores e administradores',
+})
 @Controller('statistics')
 export class StatisticsController {
   constructor(
