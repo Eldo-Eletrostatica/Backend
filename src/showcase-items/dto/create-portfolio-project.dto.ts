@@ -6,7 +6,7 @@ import {
   SERVICE_TYPE_MAX_LENGTH,
   TITLE_MAX_LENGTH,
 } from '../showcase-items.constants';
-import { TrimString } from './trim-string.transform';
+import { TrimString } from '../../common/trim-string';
 
 export class CreatePortfolioProjectDto {
   @ApiProperty({ maxLength: TITLE_MAX_LENGTH })
