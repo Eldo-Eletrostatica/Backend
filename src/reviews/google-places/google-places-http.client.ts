@@ -6,6 +6,24 @@ const REQUEST_TIMEOUT_MS = 5000;
 const FIELD_MASK = 'googleMapsUri,reviews';
 const REVIEWS_LANGUAGE_CODE = 'pt-BR';
 
+// Error body of Google APIs, such as { error: { status: 'PERMISSION_DENIED',
+// message: 'Billing is not enabled...' } }. It never echoes the API key.
+interface GoogleErrorBody {
+  error?: { status?: string; message?: string };
+}
+
+// The reason tells a disabled billing apart from a restricted key or a
+// disabled API, which all come as 403.
+async function readErrorReason(response: Response): Promise<string> {
+  try {
+    const { error } = (await response.json()) as GoogleErrorBody;
+    const reason = [error?.status, error?.message].filter(Boolean).join(': ');
+    return reason ? ` (${reason})` : '';
+  } catch {
+    return '';
+  }
+}
+
 export class GooglePlacesHttpClient extends GooglePlacesClient {
   constructor(
     private readonly apiKey: string | undefined,
@@ -31,7 +49,9 @@ export class GooglePlacesHttpClient extends GooglePlacesClient {
     );
 
     if (!response.ok) {
-      throw new Error(`Google Places API responded with ${response.status}`);
+      throw new Error(
+        `Google Places API responded with ${response.status}${await readErrorReason(response)}`,
+      );
     }
 
     return (await response.json()) as GooglePlaceDetails;
