@@ -327,7 +327,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
 
       expect(res.headers['content-type']).toBe('application/pdf');
       expect(res.headers['content-disposition']).toBe(
-        'attachment; filename="estatisticas-2041-03-01-a-2041-03-31.pdf"',
+        'attachment; filename="relatorio-estatisticas-2041-03-01-a-2041-03-31.pdf"',
       );
       expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
     });
@@ -338,7 +338,7 @@ describe('Análises estatísticas (e2e) - US11 e US12', () => {
       const res = await exportStatistics('xlsx').expect(200);
 
       expect(res.headers['content-disposition']).toBe(
-        'attachment; filename="estatisticas-2041-03-01-a-2041-03-31.xlsx"',
+        'attachment; filename="relatorio-estatisticas-2041-03-01-a-2041-03-31.xlsx"',
       );
       const workbook = new Workbook();
       // exceljs types load() with its own Buffer, which is an ArrayBuffer.

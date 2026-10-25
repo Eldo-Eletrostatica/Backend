@@ -54,13 +54,13 @@ describe('StatisticsExportService', () => {
       ExportFormat.Pdf,
       PDF_CONTENT,
       'application/pdf',
-      'estatisticas-2026-10-01-a-2026-10-31.pdf',
+      'relatorio-estatisticas-2026-10-01-a-2026-10-31.pdf',
     ],
     [
       ExportFormat.Xlsx,
       XLSX_CONTENT,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'estatisticas-2026-10-01-a-2026-10-31.xlsx',
+      'relatorio-estatisticas-2026-10-01-a-2026-10-31.xlsx',
     ],
   ])(
     'exporta em %s com o conteúdo, o tipo e o nome do arquivo certos',

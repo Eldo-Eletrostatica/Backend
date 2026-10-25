@@ -31,7 +31,8 @@ export class StatisticsExportService {
     private readonly statisticsSpreadsheetBuilder: StatisticsSpreadsheetBuilder,
   ) {}
 
-  // The file holds the same numbers the dashboard shows for the period.
+  // The file holds the same numbers the dashboard shows for the period. The
+  // name follows the US24 reports (relatorio-comissoes-...).
   async exportStatistics(
     query: ExportStatisticsQueryDto,
   ): Promise<ExportedFile> {
@@ -43,7 +44,7 @@ export class StatisticsExportService {
     return {
       content: await this.buildFile(query.format, statistics),
       contentType: CONTENT_TYPES[query.format],
-      fileName: `estatisticas-${query.startDate}-a-${query.endDate}.${query.format}`,
+      fileName: `relatorio-estatisticas-${query.startDate}-a-${query.endDate}.${query.format}`,
     };
   }
 
