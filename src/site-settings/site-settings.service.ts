@@ -54,6 +54,28 @@ export class SiteSettingsService {
     return this.draftOf(await this.findSettings());
   }
 
+  async getIsEstimatorEnabled(): Promise<Boolean> {
+    return (await this.findSettings()).isEstimatorEnabled;
+  }
+
+  async toggleEstimator(enable: boolean): Promise<Boolean> {
+    return this.updateLockedSettings((settings)=> {
+      settings.isEstimatorEnabled = enable;
+      return enable;
+    })
+  }
+
+  async getNegotiationMargin(): Promise<Number> {
+    return (await this.findSettings()).negotiationMargin;
+  }
+
+  async setNegotiationMargin(margin: number): Promise<Number>{
+    return this.updateLockedSettings((settings) => {
+      settings.negotiationMargin = margin;
+      return margin;
+    })
+  }
+
   async updateDraftVisualSettings(
     patch: VisualSettingsPatch,
   ): Promise<VisualSettings> {

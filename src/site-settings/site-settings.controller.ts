@@ -112,4 +112,27 @@ export class SiteSettingsController {
   restoreDefaultVisualSettings(): Promise<VisualSettings> {
     return this.siteSettingsService.restoreDefaultVisualSettings();
   }
+
+  @Patch('estimator/disable')
+  @ApiOperation({
+    summary: 'Desabilita a ferramenta de orçamento automático'
+  })
+  @ApiOkResponse({
+    description: 'Ferramenta desativada com sucesso'
+  })
+  disableEstimator(): Promise<Boolean> {
+    return this.siteSettingsService.toggleEstimator(false);
+  }
+
+  @Patch('estimator/enable')
+  @ApiOperation({
+    summary: 'Habilita a ferramenta de orçamento automático'
+  })
+  @ApiOkResponse({
+    description: 'Ferramenta ativada com sucesso'
+  })
+  enableEstimator(): Promise<Boolean> {
+    return this.siteSettingsService.toggleEstimator(true);
+  }
+
 }
