@@ -40,6 +40,9 @@ Variáveis disponíveis (`.env.example`):
 | `S3_ACCESS_KEY_ID` | Chave de acesso ao bucket |
 | `S3_SECRET_ACCESS_KEY` | Segredo da chave de acesso |
 | `S3_PUBLIC_URL` | URL pública do bucket, usada para montar o link salvo no banco |
+| `GOOGLE_PLACES_API_KEY` | Chave da Places API do Google Cloud, usada pela rota `/reviews`. **Ainda não existe** (ver [Avaliações do Google](#avaliações-do-google)) |
+| `GOOGLE_PLACE_ID` | Place ID da Eldo no Google, a empresa cujas avaliações aparecem no site |
+| `USE_SAMPLE_REVIEWS` | Com `true`, a rota `/reviews` devolve avaliações de exemplo no lugar das do Google. O `docker-compose.yml` liga por padrão, para o desenvolvimento rodar sem chave. Em produção, deixe `false` |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
@@ -133,6 +136,22 @@ No desenvolvimento, a chave `eldo-dev` (definida em `docker/seaweedfs/s3.json`) 
 Os arquivos ficam no volume `seaweedfs_data`, e o `docker compose down -v` apaga junto com o banco. O `seaweedfs-setup` também cria o bucket `eldo-test`, que os testes de integração usam no lugar do `eldo` (`test/setup-env.ts`). Assim os testes podem apagar o que enviam sem mexer nas imagens de desenvolvimento.
 
 No código, só o módulo `storage` (`src/storage/`) fala com o bucket. Uma feature com upload importa o `StorageModule`, injeta o `StorageService` e chama `upload(arquivo, pasta)`, que guarda o arquivo com nome aleatório e devolve `{ key, url }`. A URL é o que vai para o banco. O formato e o tamanho aceitos são validados pela própria feature, antes do upload. Exemplo: a configuração visual do site (`src/site-settings/`) aceita PNG, JPEG e WebP até 5 MB na pasta `visual/` e, ao publicar, apaga as imagens dessa pasta que não estão em uso e foram enviadas há mais de 1 hora.
+
+## Avaliações do Google
+
+> [!WARNING]
+> **Pendente: ainda não temos a conta do Google Cloud nem a chave da Places API.** A rota `/reviews` nunca foi testada contra o Google de verdade. Até a chave existir, o desenvolvimento usa as avaliações de exemplo (`USE_SAMPLE_REVIEWS=true`), e um servidor sem a chave responde `isAvailable: false`, com um aviso no log ao subir. Antes de publicar o site, é preciso fazer os passos abaixo.
+
+A rota `GET /reviews` (US05) busca as avaliações da Eldo na Places API (New) a cada requisição, porque as políticas do Google proíbem guardar esse conteúdo. Para segurar o custo, ela faz no máximo 30 chamadas por dia, o que cabe nas 1.000 grátis do mês.
+
+Para ligar o Google de verdade:
+
+1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto e cadastre a conta de cobrança.
+2. Em **APIs e serviços › Biblioteca**, ative a **Places API (New)**.
+3. Em **APIs e serviços › Credenciais**, crie uma chave de API e restrinja ela à Places API (New).
+4. Em **APIs e serviços › Cotas**, defina uma cota diária para a Places API, como segunda proteção de custo.
+5. Pegue o Place ID da Eldo no [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id). Ele começa com `ChIJ`.
+6. No servidor, configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID` e `USE_SAMPLE_REVIEWS=false`.
 
 ## Rodando localmente sem Docker (alternativa)
 

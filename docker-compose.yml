@@ -62,6 +62,9 @@ services:
       S3_SECRET_ACCESS_KEY: eldo-dev-secret
       S3_PUBLIC_URL: http://localhost:8333/eldo
       CHOKIDAR_USEPOLLING: 'true'
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      GOOGLE_PLACE_ID: ${GOOGLE_PLACE_ID:-}
+      USE_SAMPLE_REVIEWS: ${USE_SAMPLE_REVIEWS:-true}
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
