@@ -4,6 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import { IMAGE_CLEANUP_GRACE_PERIOD_MS } from '../src/storage/storage.service';
 import {
   ShowcaseItem,
   ShowcaseItemType,
@@ -13,6 +14,8 @@ const EVENTS_PATH = '/showcase-items/company-events';
 const IMAGES_PATH = '/showcase-items/images';
 const MIN_EVENTS = 3;
 const MAX_EVENTS = 10;
+// The minimum is covered by the unit tests: reaching exactly three events here
+// would mean deleting the events of the development database.
 // Everything the suite creates carries this prefix, so the cleanup never
 // touches rows registered by hand in the development database.
 const E2E_PREFIX = 'e2e ';
@@ -89,9 +92,14 @@ describe('Vitrine: eventos (e2e)', () => {
     );
 
   beforeAll(async () => {
+    // Without the grace period, every change deletes the images the test just
+    // uploaded and did not save in an event.
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(IMAGE_CLEANUP_GRACE_PERIOD_MS)
+      .useValue(0)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -104,20 +112,35 @@ describe('Vitrine: eventos (e2e)', () => {
     await app.close();
   });
 
-  describe('linha do tempo', () => {
-    it('lista os eventos do mais recente ao mais antigo', async () => {
+  describe('listagem', () => {
+    it.each([
+      [
+        'pela data do evento, para a linha do tempo do site',
+        {},
+        [`${E2E_PREFIX}Junho`, `${E2E_PREFIX}Janeiro`],
+      ],
+      [
+        'pela data de criação, para o painel',
+        { orderBy: 'createdAt' },
+        [`${E2E_PREFIX}Janeiro`, `${E2E_PREFIX}Junho`],
+      ],
+    ])('lista os eventos %s', async (_case, query, expectedTitles) => {
+      await createdId({ title: `${E2E_PREFIX}Junho`, eventDate: '2026-06-20' });
       await createdId({
-        title: `${E2E_PREFIX}Antigo`,
+        title: `${E2E_PREFIX}Janeiro`,
         eventDate: '2026-01-10',
       });
-      await createdId({ title: `${E2E_PREFIX}Novo`, eventDate: '2026-06-20' });
 
-      const response = await api().get(EVENTS_PATH).expect(200);
+      const response = await api().get(EVENTS_PATH).query(query).expect(200);
 
       const mine = (response.body as { title: string }[])
         .map((event) => event.title)
         .filter((title) => title.startsWith(E2E_PREFIX));
-      expect(mine).toEqual([`${E2E_PREFIX}Novo`, `${E2E_PREFIX}Antigo`]);
+      expect(mine).toEqual(expectedTitles);
+    });
+
+    it('recusa uma ordenação desconhecida', async () => {
+      await api().get(EVENTS_PATH).query({ orderBy: 'title' }).expect(400);
     });
   });
 
@@ -173,6 +196,14 @@ describe('Vitrine: eventos (e2e)', () => {
       expect(await statusOf(newUrl)).toBe(200);
     });
 
+    it('apaga um upload que nunca foi salvo em um evento', async () => {
+      const abandonedUrl = await uploadImage();
+
+      await createdId();
+
+      expect(await statusOf(abandonedUrl)).toBe(404);
+    });
+
     it('apara os espaços do título', async () => {
       const created = await createEvent({ title: `${E2E_PREFIX}Feira  ` });
 
@@ -201,36 +232,16 @@ describe('Vitrine: eventos (e2e)', () => {
   });
 
   describe('limites', () => {
-    it('recusa o evento acima do máximo de 10', async () => {
+    it('recusa com 409 o evento acima do máximo de 10, sem gravar', async () => {
       await fillEventsTo(MAX_EVENTS);
 
       const response = await createEvent({ title: `${E2E_PREFIX}Extra` });
 
-      expect(response.status).toBe(400);
-    });
-
-    it('recusa remover quando restam só 1 evento', async () => {
-      // Skipped when the development database already has more than 3 events
-      // of its own: the test cannot bring the total down without deleting them.
-      await fillEventsTo(MIN_EVENTS);
-      if ((await countEvents()) > MIN_EVENTS) {
-        return;
-      }
-      const id = await createdId().catch(() => null);
-      // With 3 events the create succeeds (3 < 10); remove it back to 3 first.
-      if (id !== null) {
-        await dataSource.query(
-          `DELETE FROM showcase_items WHERE showcase_item_id = $1`,
-          [id],
-        );
-      }
-      const [anyEvent] = await dataSource.query<{ showcase_item_id: string }[]>(
-        `SELECT showcase_item_id FROM showcase_items WHERE type = '${ShowcaseItemType.CompanyEvent}' LIMIT 1`,
+      expect(response.status).toBe(409);
+      expect((response.body as { message: string }).message).toBe(
+        'A vitrine aceita no máximo 10 eventos.',
       );
-
-      await api()
-        .delete(`${EVENTS_PATH}/${anyEvent.showcase_item_id}`)
-        .expect(400);
+      expect(await countEvents()).toBe(MAX_EVENTS);
     });
   });
 
@@ -241,6 +252,8 @@ describe('Vitrine: eventos (e2e)', () => {
       ['descrição só com espaços', { description: '   ' }],
       ['data ausente', { eventDate: undefined }],
       ['data em formato inválido', { eventDate: '12/09/2026' }],
+      ['data com hora', { eventDate: '2026-09-12T10:00:00Z' }],
+      ['data inexistente', { eventDate: '2026-02-30' }],
       ['campo desconhecido', { unexpected: true }],
       ['imagem de outro site', { imageUrl: 'https://exemplo.com/evento.jpg' }],
       [
@@ -262,10 +275,29 @@ describe('Vitrine: eventos (e2e)', () => {
     });
 
     it.each([
+      ['no POST', 'post' as const],
+      ['no PATCH', 'patch' as const],
+    ])('explica em português o formato da data %s', async (_case, method) => {
+      const path =
+        method === 'post' ? EVENTS_PATH : `${EVENTS_PATH}/${await createdId()}`;
+
+      const response = await api()
+        [method](path)
+        .send({ eventDate: '12/09/2026' })
+        .expect(400);
+
+      expect((response.body as { message: string[] }).message).toContain(
+        'eventDate deve estar no formato YYYY-MM-DD (ex: 2026-09-12)',
+      );
+    });
+
+    it.each([
       ['título nulo', { title: null }],
       ['imagem nula', { imageUrl: null }],
       ['data nula', { eventDate: null }],
       ['data inválida', { eventDate: 'ontem' }],
+      ['data com hora', { eventDate: '2026-09-12T10:00:00Z' }],
+      ['imagem de outro site', { imageUrl: 'https://exemplo.com/evento.jpg' }],
     ])('recusa %s no PATCH com 400', async (_case, body) => {
       const id = await createdId();
 

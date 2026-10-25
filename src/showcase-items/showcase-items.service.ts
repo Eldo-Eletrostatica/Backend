@@ -15,11 +15,16 @@ import { StorageService } from '../storage/storage.service';
 import { CompanyEventResponseDto } from './dto/company-event-response.dto';
 import { CreateCompanyEventDto } from './dto/create-company-event.dto';
 import { CreatePortfolioProjectDto } from './dto/create-portfolio-project.dto';
+import {
+  CompanyEventOrderBy,
+  ListCompanyEventsQueryDto,
+} from './dto/list-company-events-query.dto';
 import { ListPortfolioProjectsQueryDto } from './dto/list-portfolio-projects-query.dto';
 import {
   PaginatedPortfolioProjectsDto,
   PortfolioProjectResponseDto,
 } from './dto/portfolio-project-response.dto';
+import { RenamePortfolioCategoryDto } from './dto/rename-portfolio-category.dto';
 import { UpdateCompanyEventDto } from './dto/update-company-event.dto';
 import { UpdatePortfolioProjectDto } from './dto/update-portfolio-project.dto';
 import {
@@ -28,10 +33,16 @@ import {
 } from './entities/showcase-item.entity';
 import {
   DEFAULT_PAGE_SIZE,
-  MAX_COMPANY_EVENTS,
-  MIN_COMPANY_EVENTS,
   SHOWCASE_IMAGES_FOLDER,
 } from './showcase-items.constants';
+import {
+  assertCompanyEventLimits,
+  assertPortfolioLimits,
+  ProjectsPerPortfolioCategory,
+  withPortfolioCategoryRemoved,
+  withPortfolioCategoryRenamed,
+  withProjectMoved,
+} from './showcase-limits';
 
 @Injectable()
 export class ShowcaseItemsService {
@@ -54,8 +65,6 @@ export class ShowcaseItemsService {
     );
     return { url };
   }
-
-  // ---- Portfolio projects ----
 
   async findPortfolioProjects(
     query: ListPortfolioProjectsQueryDto,
@@ -102,7 +111,10 @@ export class ShowcaseItemsService {
     showcaseItemId: string,
   ): Promise<PortfolioProjectResponseDto> {
     return PortfolioProjectResponseDto.fromEntity(
-      await this.findPortfolioProjectOrFail(showcaseItemId),
+      await this.findPortfolioProjectOrFail(
+        this.showcaseItemsRepository,
+        showcaseItemId,
+      ),
     );
   }
 
@@ -110,12 +122,19 @@ export class ShowcaseItemsService {
     dto: CreatePortfolioProjectDto,
   ): Promise<PortfolioProjectResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
-    const project = await this.showcaseItemsRepository.save(
-      this.showcaseItemsRepository.create({
-        ...dto,
-        type: ShowcaseItemType.PortfolioProject,
-      }),
-    );
+    const project = await this.withShowcaseLock(async (repository) => {
+      const current = await this.countProjectsPerPortfolioCategory(repository);
+      assertPortfolioLimits(
+        current,
+        withProjectMoved(current, null, dto.category),
+      );
+      return repository.save(
+        repository.create({
+          ...dto,
+          type: ShowcaseItemType.PortfolioProject,
+        }),
+      );
+    });
     await this.deleteUnusedImages();
     return PortfolioProjectResponseDto.fromEntity(project);
   }
@@ -125,26 +144,95 @@ export class ShowcaseItemsService {
     dto: UpdatePortfolioProjectDto,
   ): Promise<PortfolioProjectResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl, dto.beforeUrl, dto.afterUrl]);
-    const project = await this.findPortfolioProjectOrFail(showcaseItemId);
-    Object.assign(project, dto);
-    const saved = await this.showcaseItemsRepository.save(project);
+    const saved = await this.withShowcaseLock(async (repository) => {
+      const project = await this.findPortfolioProjectOrFail(
+        repository,
+        showcaseItemId,
+      );
+      if (dto.category !== undefined && dto.category !== project.category) {
+        const current =
+          await this.countProjectsPerPortfolioCategory(repository);
+        assertPortfolioLimits(
+          current,
+          withProjectMoved(current, project.category, dto.category),
+        );
+      }
+      Object.assign(project, dto);
+      return repository.save(project);
+    });
     await this.deleteUnusedImages();
     return PortfolioProjectResponseDto.fromEntity(saved);
   }
 
   async removePortfolioProject(showcaseItemId: string): Promise<void> {
-    const project = await this.findPortfolioProjectOrFail(showcaseItemId);
-    await this.showcaseItemsRepository.remove(project);
+    await this.withShowcaseLock(async (repository) => {
+      const project = await this.findPortfolioProjectOrFail(
+        repository,
+        showcaseItemId,
+      );
+      const current = await this.countProjectsPerPortfolioCategory(repository);
+      assertPortfolioLimits(
+        current,
+        withProjectMoved(current, project.category, null),
+      );
+      await repository.remove(project);
+    });
     await this.deleteUnusedImages();
   }
 
-  // ---- Company events ----
+  // Renames the category in all its projects; a name already in use merges
+  // both categories.
+  async renamePortfolioCategory(
+    category: string,
+    dto: RenamePortfolioCategoryDto,
+  ): Promise<string[]> {
+    await this.withShowcaseLock(async (repository) => {
+      const current = await this.countProjectsPerPortfolioCategory(repository);
+      this.assertPortfolioCategoryExists(current, category);
+      // A name not in use only relabels the projects, so only a merge can
+      // pass a limit.
+      if (current.has(dto.name)) {
+        assertPortfolioLimits(
+          current,
+          withPortfolioCategoryRenamed(current, category, dto.name),
+        );
+      }
+      await repository.update(
+        { type: ShowcaseItemType.PortfolioProject, category },
+        { category: dto.name },
+      );
+    });
+    return this.findPortfolioCategories();
+  }
 
-  // Vertical timeline of the site: newest event first.
-  async findCompanyEvents(): Promise<CompanyEventResponseDto[]> {
+  // A category exists only through its projects, so removing it removes them.
+  async removePortfolioCategory(category: string): Promise<void> {
+    await this.withShowcaseLock(async (repository) => {
+      const current = await this.countProjectsPerPortfolioCategory(repository);
+      this.assertPortfolioCategoryExists(current, category);
+      assertPortfolioLimits(
+        current,
+        withPortfolioCategoryRemoved(current, category),
+      );
+      await repository.delete({
+        type: ShowcaseItemType.PortfolioProject,
+        category,
+      });
+    });
+    await this.deleteUnusedImages();
+  }
+
+  // The site shows a timeline by the event date; the admin panel lists the
+  // newest created event first.
+  async findCompanyEvents(
+    query: ListCompanyEventsQueryDto,
+  ): Promise<CompanyEventResponseDto[]> {
     const events = await this.showcaseItemsRepository.find({
       where: { type: ShowcaseItemType.CompanyEvent },
-      order: { eventDate: 'DESC', createdAt: 'DESC' },
+      order:
+        query.orderBy === CompanyEventOrderBy.CreatedAt
+          ? { createdAt: 'DESC' }
+          : { eventDate: 'DESC', createdAt: 'DESC' },
     });
     return events.map((event) => CompanyEventResponseDto.fromEntity(event));
   }
@@ -153,7 +241,10 @@ export class ShowcaseItemsService {
     showcaseItemId: string,
   ): Promise<CompanyEventResponseDto> {
     return CompanyEventResponseDto.fromEntity(
-      await this.findCompanyEventOrFail(showcaseItemId),
+      await this.findCompanyEventOrFail(
+        this.showcaseItemsRepository,
+        showcaseItemId,
+      ),
     );
   }
 
@@ -161,19 +252,15 @@ export class ShowcaseItemsService {
     dto: CreateCompanyEventDto,
   ): Promise<CompanyEventResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl]);
-    const total = await this.countCompanyEvents();
-    if (total >= MAX_COMPANY_EVENTS) {
-      throw new BadRequestException(
-        `O limite é de ${MAX_COMPANY_EVENTS} eventos`,
+    const event = await this.withShowcaseLock(async (repository) => {
+      const total = await this.countCompanyEvents(repository);
+      assertCompanyEventLimits(total, total + 1);
+      return repository.save(
+        repository.create({ ...dto, type: ShowcaseItemType.CompanyEvent }),
       );
-    }
-    const event = this.showcaseItemsRepository.create({
-      ...dto,
-      type: ShowcaseItemType.CompanyEvent,
     });
-    return CompanyEventResponseDto.fromEntity(
-      await this.showcaseItemsRepository.save(event),
-    );
+    await this.deleteUnusedImages();
+    return CompanyEventResponseDto.fromEntity(event);
   }
 
   async updateCompanyEvent(
@@ -181,35 +268,35 @@ export class ShowcaseItemsService {
     dto: UpdateCompanyEventDto,
   ): Promise<CompanyEventResponseDto> {
     this.assertImagesFromUpload([dto.imageUrl]);
-    const event = await this.findCompanyEventOrFail(showcaseItemId);
-    const previousImageUrl = event.imageUrl;
-
-    Object.assign(event, dto);
-    const saved = await this.showcaseItemsRepository.save(event);
-
-    if (saved.imageUrl !== previousImageUrl) {
-      await this.deleteImages([previousImageUrl]);
-    }
+    // Inside the lock, an event removed meanwhile gives 404: outside it, save()
+    // would insert the removed row again, past the limits.
+    const saved = await this.withShowcaseLock(async (repository) => {
+      const event = await this.findCompanyEventOrFail(
+        repository,
+        showcaseItemId,
+      );
+      Object.assign(event, dto);
+      return repository.save(event);
+    });
+    await this.deleteUnusedImages();
     return CompanyEventResponseDto.fromEntity(saved);
   }
 
   async removeCompanyEvent(showcaseItemId: string): Promise<void> {
-    const event = await this.findCompanyEventOrFail(showcaseItemId);
-    const total = await this.countCompanyEvents();
-    if (total <= MIN_COMPANY_EVENTS) {
-      throw new BadRequestException(
-        `É preciso manter ao menos ${MIN_COMPANY_EVENTS} eventos`,
+    await this.withShowcaseLock(async (repository) => {
+      const event = await this.findCompanyEventOrFail(
+        repository,
+        showcaseItemId,
       );
-    }
-    const imageUrl = event.imageUrl;
-    await this.showcaseItemsRepository.remove(event);
-    await this.deleteImages([imageUrl]);
+      const total = await this.countCompanyEvents(repository);
+      assertCompanyEventLimits(total, total - 1);
+      await repository.remove(event);
+    });
+    await this.deleteUnusedImages();
   }
 
-  // ---- Shared helpers ----
-
-  // Only images sent through the upload route are accepted, so every picture
-  // of the showcase lives in the bucket.
+  // Only images sent through the upload route are accepted, so the cleanup
+  // knows every picture of the showcase.
   private assertImagesFromUpload(urls: Array<string | null | undefined>): void {
     const hasForeignImage = urls.some(
       (url) =>
@@ -220,6 +307,51 @@ export class ShowcaseItemsService {
       throw new BadRequestException(
         'Envie a imagem pela rota de upload e use a URL devolvida.',
       );
+    }
+  }
+
+  // The limits count rows that other requests may be changing at the same
+  // time. Counting and saving in one transaction, behind a lock shared by
+  // every limited change, keeps two requests from passing the same limit.
+  private withShowcaseLock<Result>(
+    change: (repository: Repository<ShowcaseItem>) => Promise<Result>,
+  ): Promise<Result> {
+    return this.showcaseItemsRepository.manager.transaction(async (manager) => {
+      await manager.query(
+        `SELECT pg_advisory_xact_lock(hashtext('showcase_items'))`,
+      );
+      return change(manager.getRepository(ShowcaseItem));
+    });
+  }
+
+  private async countProjectsPerPortfolioCategory(
+    repository: Repository<ShowcaseItem>,
+  ): Promise<ProjectsPerPortfolioCategory> {
+    const projects = await repository.find({
+      select: { category: true },
+      where: { type: ShowcaseItemType.PortfolioProject },
+    });
+    const counts: ProjectsPerPortfolioCategory = new Map();
+    for (const { category } of projects) {
+      if (category !== null) {
+        counts.set(category, (counts.get(category) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }
+
+  private countCompanyEvents(
+    repository: Repository<ShowcaseItem>,
+  ): Promise<number> {
+    return repository.countBy({ type: ShowcaseItemType.CompanyEvent });
+  }
+
+  private assertPortfolioCategoryExists(
+    current: ProjectsPerPortfolioCategory,
+    category: string,
+  ): void {
+    if (!current.has(category)) {
+      throw new NotFoundException('Categoria não encontrada');
     }
   }
 
@@ -237,26 +369,16 @@ export class ShowcaseItemsService {
         items.flatMap((item) => [item.imageUrl, item.beforeUrl, item.afterUrl]),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-
-      this.logger.error(
-        'Falha ao apagar imagens da vitrine do bucket',
-        message,
-      );
+      this.logger.error('Falha ao apagar imagens sem uso da vitrine', error);
     }
-  }
-
-  private countCompanyEvents(): Promise<number> {
-    return this.showcaseItemsRepository.countBy({
-      type: ShowcaseItemType.CompanyEvent,
-    });
   }
 
   // Events and projects share the table, so every lookup filters by type.
   private async findPortfolioProjectOrFail(
+    repository: Repository<ShowcaseItem>,
     showcaseItemId: string,
   ): Promise<ShowcaseItem> {
-    const project = await this.showcaseItemsRepository.findOneBy({
+    const project = await repository.findOneBy({
       showcaseItemId,
       type: ShowcaseItemType.PortfolioProject,
     });
@@ -267,9 +389,10 @@ export class ShowcaseItemsService {
   }
 
   private async findCompanyEventOrFail(
+    repository: Repository<ShowcaseItem>,
     showcaseItemId: string,
   ): Promise<ShowcaseItem> {
-    const event = await this.showcaseItemsRepository.findOneBy({
+    const event = await repository.findOneBy({
       showcaseItemId,
       type: ShowcaseItemType.CompanyEvent,
     });

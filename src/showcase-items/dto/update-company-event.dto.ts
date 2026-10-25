@@ -1,8 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { TITLE_MAX_LENGTH } from '../showcase-items.constants';
-import { IsOmittable } from './is-omittable';
-import { TrimString } from './trim-string.transform';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
+import { IsOmittable } from '../../common/is-omittable';
+import { TrimString } from '../../common/trim-string';
+import {
+  DATE_ONLY_PATTERN,
+  TITLE_MAX_LENGTH,
+} from '../showcase-items.constants';
 
 // Every column of an event is NOT NULL, so no field accepts null.
 export class UpdateCompanyEventDto {
@@ -29,6 +38,9 @@ export class UpdateCompanyEventDto {
 
   @ApiPropertyOptional({ example: '2026-09-12' })
   @IsOmittable()
+  @Matches(DATE_ONLY_PATTERN, {
+    message: 'eventDate deve estar no formato YYYY-MM-DD (ex: 2026-09-12)',
+  })
   @IsDateString({ strict: true })
   eventDate?: string;
 }
