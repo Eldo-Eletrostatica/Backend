@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { Workbook } from 'exceljs';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
@@ -13,7 +14,7 @@ const TEST_PERIOD = { startDate: '2041-03-01', endDate: '2041-03-31' };
 const INSIDE_PERIOD = '2041-03-15T12:00:00.000Z';
 const AFTER_PERIOD = '2041-04-02T12:00:00.000Z';
 
-describe('Dashboard de análises estatísticas (e2e) - US11', () => {
+describe('Análises estatísticas (e2e) - US11 e US12', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
   // Every sale needs a seller (CHK_orders_sale); one is enough for the tests.
@@ -299,6 +300,83 @@ describe('Dashboard de análises estatísticas (e2e) - US11', () => {
       expect((res.body as { message: string }).message).toBe(
         'A data inicial não pode ser posterior à data final.',
       );
+    });
+  });
+
+  describe('Exportação de relatórios (US12)', () => {
+    // 'blob' makes supertest keep the file bytes in res.body as a Buffer.
+    function exportStatistics(format: string, period = TEST_PERIOD) {
+      return request(app.getHttpServer())
+        .get('/statistics/export')
+        .query({ ...period, format })
+        .responseType('blob');
+    }
+
+    async function insertQuoteWithPaintType() {
+      const epoxyId = await insertCatalogItem('paintType', 'Epóxi Teste');
+      const steelId = await insertCatalogItem('partMaterial', 'Aço Teste');
+      const orderId = await insertSoldQuote('pdf', INSIDE_PERIOD);
+      await insertQuote('estimator', INSIDE_PERIOD);
+      await insertOrderItem(orderId, epoxyId, steelId);
+    }
+
+    it('Critério 1: gera e baixa um PDF com os dados do período', async () => {
+      await insertQuoteWithPaintType();
+
+      const res = await exportStatistics('pdf').expect(200);
+
+      expect(res.headers['content-type']).toBe('application/pdf');
+      expect(res.headers['content-disposition']).toBe(
+        'attachment; filename="relatorio-estatisticas-2041-03-01-a-2041-03-31.pdf"',
+      );
+      expect((res.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+    });
+
+    it('Critério 2: gera e baixa uma planilha XLSX com os dados do período', async () => {
+      await insertQuoteWithPaintType();
+
+      const res = await exportStatistics('xlsx').expect(200);
+
+      expect(res.headers['content-disposition']).toBe(
+        'attachment; filename="relatorio-estatisticas-2041-03-01-a-2041-03-31.xlsx"',
+      );
+      const workbook = new Workbook();
+      // exceljs types load() with its own Buffer, which is an ArrayBuffer.
+      await workbook.xlsx.load(new Uint8Array(res.body as Buffer).buffer);
+      const indicators = workbook.getWorksheet('Indicadores');
+      const paintTypes = workbook.getWorksheet('Tipos de pintura');
+      expect(indicators?.getCell('B4').value).toBe(2);
+      expect(indicators?.getCell('B6').value).toBe(0.5);
+      expect(indicators?.getCell('B6').numFmt).toBe('0.00%');
+      expect(paintTypes?.getCell('B2').value).toBe('Epóxi Teste');
+    });
+
+    it.each([
+      ['pdf', 'PDF'],
+      ['xlsx', 'planilha'],
+    ])(
+      'Critério 3: avisa que não há dados ao exportar %s (%s) de um período vazio',
+      async (format) => {
+        const res = await request(app.getHttpServer())
+          .get('/statistics/export')
+          .query({ ...TEST_PERIOD, format })
+          .expect(422);
+
+        expect((res.body as { message: string }).message).toBe(
+          'Não há dados para exportar no período.',
+        );
+      },
+    );
+
+    it.each([
+      ['sem formato', { ...TEST_PERIOD }],
+      ['formato csv', { ...TEST_PERIOD, format: 'csv' }],
+      ['sem datas', { format: 'pdf' }],
+    ])('rejeita a exportação %s: %j', async (_, query) => {
+      await request(app.getHttpServer())
+        .get('/statistics/export')
+        .query(query)
+        .expect(400);
     });
   });
 });
