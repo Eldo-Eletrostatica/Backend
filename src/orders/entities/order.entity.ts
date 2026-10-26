@@ -25,6 +25,8 @@ export enum OrderSource {
 
 export enum OrderStatus {
   Requested = 'requested',
+  // A contact request that the team already answered by WhatsApp.
+  Handled = 'handled',
   Sent = 'sent',
   Approved = 'approved',
   Rejected = 'rejected',

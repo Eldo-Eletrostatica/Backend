@@ -19,7 +19,7 @@ Cliente pessoa jurídica, identificado pelo CNPJ e atendido por e-mail.
 _Avoid_: company, corporate, pj
 
 **ContactRequest** (solicitação de contato):
-Mensagem que o cliente PF envia pelo formulário de contato para ser atendido por uma pessoa pelo WhatsApp. É um pedido com origem `contact`: começa como `requested` e segue as etapas do pedido se virar negócio.
+Mensagem que o cliente PF envia pelo formulário de contato para ser atendido por uma pessoa pelo WhatsApp. É um pedido com origem `contact`: começa como `requested` (novo), passa a `handled` quando a equipe atende e segue as etapas do pedido se virar negócio.
 _Avoid_: lead, message
 
 **Review** (avaliação):
@@ -33,7 +33,7 @@ Registro único que acompanha um negócio do primeiro contato à entrega: solici
 _Avoid_: request, job, deal
 
 **OrderStatus** (status do pedido):
-Etapa do pedido. As do orçamento: `requested` (pedido pelo cliente), `sent` (a Eldo enviou o valor), `approved` (aprovado) ou `rejected` (recusado). As da OS, depois da venda: `queued` (em fila), `inProduction` (em produção), `finishing` (em finalização) ou `completed` (concluído).
+Etapa do pedido. A da solicitação de contato: `handled` (atendido). As do orçamento: `requested` (pedido pelo cliente), `sent` (a Eldo enviou o valor), `approved` (aprovado) ou `rejected` (recusado). As da OS, depois da venda: `queued` (em fila), `inProduction` (em produção), `finishing` (em finalização) ou `completed` (concluído).
 _Avoid_: state, phase
 
 **Quote** (orçamento):
