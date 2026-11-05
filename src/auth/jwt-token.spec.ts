@@ -21,6 +21,7 @@ describe('jwt-token', () => {
     sub: '11111111-1111-4111-8111-111111111111',
     email: 'admin@eldo.com.br',
     role: EmployeeRole.Admin,
+    csrf: 'csrf-token-de-teste',
   };
 
   it('assina e valida um token JWT válido retornando o payload', () => {
@@ -62,6 +63,7 @@ describe('jwt-token', () => {
           sub: '22222222-2222-4222-8222-222222222222',
           email: CLAIMS.email,
           role: EmployeeRole.Admin,
+          csrf: CLAIMS.csrf,
           iat: NOW,
           exp: NOW + 3600,
         });

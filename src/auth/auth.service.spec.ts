@@ -203,17 +203,20 @@ describe('AuthService', () => {
       const employee = await buildEmployee(EmployeeRole.Manager);
       mockFindOne.mockResolvedValue(employee);
 
-      const { accessToken } = await service.login({
+      const { accessToken, csrfToken } = await service.login({
         email: employee.email,
         password: 'SenhaSegura@123',
       });
 
       const validated = await service.validateAccessToken(accessToken);
       expect(validated).toEqual({
-        employeeId: employee.employeeId,
-        name: employee.name,
-        email: employee.email,
-        role: EmployeeRole.Manager,
+        employee: {
+          employeeId: employee.employeeId,
+          name: employee.name,
+          email: employee.email,
+          role: EmployeeRole.Manager,
+        },
+        csrfToken,
       });
     });
 

@@ -7,6 +7,8 @@ export interface JwtClaims {
   sub: string;
   email: string;
   role: EmployeeRole;
+  // Echoed by the site in the CSRF header on writes authenticated by cookie.
+  csrf: string;
 }
 
 export interface JwtPayload extends JwtClaims {
@@ -88,6 +90,7 @@ export function verifyJwt(
       !Object.values(EmployeeRole).includes(
         decodedPayload.role as EmployeeRole,
       ) ||
+      typeof decodedPayload.csrf !== 'string' ||
       typeof decodedPayload.iat !== 'number' ||
       typeof decodedPayload.exp !== 'number'
     ) {

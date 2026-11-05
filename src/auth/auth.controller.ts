@@ -5,27 +5,39 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { CurrentEmployee } from './decorators/current-employee.decorator';
 import { AuthenticatedEmployeeDto } from './dto/authenticated-employee.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { clearSessionCookies, setSessionCookies } from './session-cookies';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  private readonly isSecureCookie: boolean;
+
+  constructor(
+    private readonly authService: AuthService,
+    config: ConfigService,
+  ) {
+    this.isSecureCookie = config.get<string>('NODE_ENV') === 'production';
+  }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -40,8 +52,28 @@ export class AuthController {
   })
   @ApiBadRequestResponse({ description: 'Dados de login inválidos' })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
-  login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LoginResponseDto> {
+    const { accessToken, csrfToken, employee } =
+      await this.authService.login(dto);
+    setSessionCookies(response, accessToken, csrfToken, this.isSecureCookie);
+    return { accessToken, employee };
+  }
+
+  // Public on purpose: clearing the cookies needs no valid session, and an
+  // expired one must still be able to log out.
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Encerra a sessão do site',
+    description:
+      'Apaga os cookies de sessão e de CSRF. O token Bearer não tem estado no servidor e continua válido até expirar.',
+  })
+  @ApiNoContentResponse({ description: 'Cookies da sessão apagados' })
+  logout(@Res({ passthrough: true }) response: Response): void {
+    clearSessionCookies(response, this.isSecureCookie);
   }
 
   @Get('me')

@@ -1,4 +1,10 @@
-import { Module, ValidationPipe } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  ValidationPipe,
+} from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 import { ConfigModule } from '@nestjs/config';
 import { APP_PIPE } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -70,4 +76,10 @@ import { StatisticsModule } from './statistics/statistics.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  // Registered here rather than in main.ts so the integration tests, which
+  // boot AppModule directly, parse the session cookies too.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(cookieParser()).forRoutes('{*splat}');
+  }
+}
