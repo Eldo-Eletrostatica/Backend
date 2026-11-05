@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,6 +16,15 @@ const DEFAULT_INITIAL_ADMIN_NAME = 'Administrador Eldo';
 // Fixed scrypt hash verified when the email is not found, equalizing response
 // time with a wrong-password attempt so login timing cannot enumerate emails.
 const DUMMY_PASSWORD_HASH = `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`;
+const CSRF_TOKEN_BYTES = 32;
+
+// The CSRF token goes to the session cookies; the response body stays the same.
+export type LoginSession = LoginResponseDto & { csrfToken: string };
+
+export interface ValidatedSession {
+  employee: AuthenticatedEmployeeDto;
+  csrfToken: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -30,7 +40,7 @@ export class AuthService {
 
   // Returns the same generic error whether the email does not exist or the
   // password is wrong, preventing user enumeration (US09 acceptance criterion 2).
-  async login(dto: LoginDto): Promise<LoginResponseDto> {
+  async login(dto: LoginDto): Promise<LoginSession> {
     let employee = await this.employeeRepository.findOne({
       where: { email: dto.email },
     });
@@ -56,24 +66,27 @@ export class AuthService {
     }
 
     const authenticatedEmployee = this.toAuthenticatedEmployee(employee);
+    const csrfToken = randomBytes(CSRF_TOKEN_BYTES).toString('base64url');
     const accessToken = signJwt(
       {
         sub: employee.employeeId,
         email: employee.email,
         role: employee.role,
+        csrf: csrfToken,
       },
       this.jwtSecret,
     );
 
     return {
       accessToken,
+      csrfToken,
       employee: authenticatedEmployee,
     };
   }
 
   // Validates the JWT and reloads the active employee so a soft-deleted account
   // or a role change takes effect immediately on protected routes.
-  async validateAccessToken(token: string): Promise<AuthenticatedEmployeeDto> {
+  async validateAccessToken(token: string): Promise<ValidatedSession> {
     const payload = verifyJwt(token, this.jwtSecret);
     if (!payload) {
       throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
@@ -86,7 +99,10 @@ export class AuthService {
       throw new UnauthorizedException(UNAUTHORIZED_MESSAGE);
     }
 
-    return this.toAuthenticatedEmployee(employee);
+    return {
+      employee: this.toAuthenticatedEmployee(employee),
+      csrfToken: payload.csrf,
+    };
   }
 
   // Creates the initial administrator on the first login when no administrator

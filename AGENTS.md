@@ -35,6 +35,7 @@ O que cada uma obriga:
 - **0004:** substituída pela 0005.
 - **0005 (modelo de 9 tabelas):** não crie tabela sem uma ADR que revise esta. Contato, orçamento, venda e OS são etapas de `orders`; tipos de pintura e materiais ficam em `catalog_items`; portfólio e eventos em `showcase_items`; categoria e fornecedor são texto no próprio registro; a comissão é uma regra por funcionário, em `employees`.
 - **0006 (armazenamento):** imagens e PDFs ficam num armazenamento compatível com S3 (SeaweedFS no desenvolvimento, Cloudflare R2 do cliente em produção), e o banco guarda só a URL.
+- **0007 (autenticação por cookie):** no site, a sessão do funcionário fica num cookie `HttpOnly` gravado pelo login, e o Frontend chama a API só pelo proxy `/api` do Next.js. O guard aceita o cookie ou o Bearer; uma escrita autenticada pelo cookie exige o header `X-CSRF-Token` igual ao claim `csrf` do JWT.
 
 Ao criar ou alterar uma ADR, atualize esta lista nos três repos.
 
