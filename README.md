@@ -47,6 +47,8 @@ Variáveis disponíveis (`.env.example`):
 | `INITIAL_ADMIN_NAME` | Nome do administrador inicial provisionado no primeiro login quando ainda não há administradores |
 | `INITIAL_ADMIN_EMAIL` | E-mail do administrador inicial provisionado no primeiro login |
 | `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial provisionado no primeiro login |
+| `CORS_ORIGINS` | Origens liberadas no CORS, separadas por vírgula (padrão `http://localhost:3000`). O site usa o proxy do Frontend e não depende do CORS (ver [Autenticação](#autenticação)) |
+| `NODE_ENV` | Com `production`, os cookies de sessão saem com `Secure`, e o site precisa de HTTPS |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
@@ -156,6 +158,15 @@ Para ligar o Google de verdade:
 4. Em **APIs e serviços › Cotas**, defina uma cota diária para a Places API, como segunda proteção de custo.
 5. Pegue o Place ID da Eldo no [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id). Ele começa com `ChIJ`.
 6. No servidor, configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID` e `USE_SAMPLE_REVIEWS=false`.
+
+## Autenticação
+
+A área interna autentica de dois jeitos, conforme a [ADR 0007](https://eldo-eletrostatica.github.io/Documentacao/adr/0007-autenticacao-por-cookie/):
+
+- **Site (cookie):** o `POST /auth/login` grava o cookie `session`, com o JWT (`HttpOnly`), e o cookie `csrf_token`, legível pelo Frontend, ambos com `SameSite=Strict` e validade de 8 horas. O Frontend chama a API pelo proxy `/api` do próprio site. Em toda escrita (POST, PATCH, PUT ou DELETE), ele manda o valor do `csrf_token` no header `X-CSRF-Token`. Sem o header, ou com outro valor, a API responde 403. O `POST /auth/logout` apaga os dois cookies.
+- **Swagger, testes e outros clientes (Bearer):** o login também devolve o `accessToken` no corpo. Com o header `Authorization: Bearer <token>`, nenhuma rota exige o `X-CSRF-Token`. No Swagger, use o botão **Authorize**.
+
+Em desenvolvimento, o administrador inicial é `admin@eldo.com.br` com a senha `Admin@123` (variáveis `INITIAL_ADMIN_*`), criado no primeiro login quando ainda não existe nenhum administrador.
 
 ## Rodando localmente sem Docker (alternativa)
 
