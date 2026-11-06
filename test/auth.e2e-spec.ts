@@ -16,7 +16,7 @@ import {
   MAX_LOGIN_ATTEMPTS_PER_ACCOUNT,
   MAX_LOGIN_ATTEMPTS_PER_IP,
   TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
-} from '../src/auth/guards/login-throttler.guard';
+} from '../src/auth/login-attempts.service';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { signJwt } from '../src/auth/jwt-token';
 import { hashPassword } from '../src/auth/password-hash';
@@ -348,7 +348,7 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
     ['de outra conta, do mesmo IP', 'other', true, 401],
     ['da mesma conta, de outro IP', 'same', false, 401],
   ])(
-    'limita o login a 5 tentativas por minuto por conta e IP: a 6ª tentativa %s (%s, mesmo IP: %s) responde %s',
+    'limita o login a 5 erros por minuto por conta e IP: a 6ª tentativa %s (%s, mesmo IP: %s) responde %s',
     async (_scenario, emailVariant, isSameIp, expectedStatus) => {
       const seeded = await seedEmployee();
       const attackerIp = randomClientIp();
@@ -376,7 +376,7 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
     ['do mesmo IP', true, 429],
     ['de outro IP', false, 401],
   ])(
-    'limita o login a 20 tentativas por minuto por IP, em contas diferentes: a 21ª tentativa %s (%s) responde %s',
+    'limita o login a 20 erros por minuto por IP, em contas diferentes: a 21ª tentativa %s (%s) responde %s',
     async (_scenario, isSameIp, expectedStatus) => {
       const attackerIp = randomClientIp();
       for (let i = 0; i < MAX_LOGIN_ATTEMPTS_PER_IP; i++) {
@@ -389,6 +389,62 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
       const res = await postLogin(
         { email: randomEmail(), password: 'SenhaErrada@1' },
         isSameIp ? attackerIp : randomClientIp(),
+      ).expect(expectedStatus);
+      expectTooManyAttempts(res);
+    },
+  );
+
+  // E = wrong password (401), C = correct password (200).
+  it.each([
+    ['5 acertos seguidos', 'CCCCC', 200],
+    ['4 erros, 1 acerto e mais 4 erros', 'EEEECEEEE', 200],
+    ['5 erros seguidos', 'EEEEE', 429],
+  ])(
+    'só os erros contam no limite da conta, e um acerto os zera: depois de %s (%s), o próximo login certo responde %s',
+    async (_scenario, attempts, expectedStatus) => {
+      const seeded = await seedEmployee();
+      const clientIp = randomClientIp();
+      for (const attempt of attempts) {
+        const isCorrect = attempt === 'C';
+        await postLogin(
+          {
+            email: seeded.email,
+            password: isCorrect ? seeded.password : 'SenhaErrada@1',
+          },
+          clientIp,
+        ).expect(isCorrect ? 200 : 401);
+      }
+
+      const res = await postLogin(
+        { email: seeded.email, password: seeded.password },
+        clientIp,
+      ).expect(expectedStatus);
+      expectTooManyAttempts(res);
+    },
+  );
+
+  it.each([
+    ['20 logins certos', true, 200],
+    ['20 erros', false, 429],
+  ])(
+    'só os erros contam no limite do IP: depois de %s em contas diferentes do mesmo IP (%s), o 21º login certo responde %s',
+    async (_scenario, isCorrect, expectedStatus) => {
+      const clientIp = randomClientIp();
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS_PER_IP; i++) {
+        const seeded = await seedEmployee();
+        await postLogin(
+          {
+            email: seeded.email,
+            password: isCorrect ? seeded.password : 'SenhaErrada@1',
+          },
+          clientIp,
+        ).expect(isCorrect ? 200 : 401);
+      }
+
+      const seeded = await seedEmployee();
+      const res = await postLogin(
+        { email: seeded.email, password: seeded.password },
+        clientIp,
       ).expect(expectedStatus);
       expectTooManyAttempts(res);
     },
