@@ -12,6 +12,10 @@ import {
 } from '../src/auth/auth.service';
 import { AuthenticatedEmployeeDto } from '../src/auth/dto/authenticated-employee.dto';
 import { CSRF_TOKEN_MISMATCH_MESSAGE } from '../src/auth/guards/jwt-auth.guard';
+import {
+  MAX_LOGIN_ATTEMPTS_PER_MINUTE,
+  TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
+} from '../src/auth/guards/login-throttler.guard';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { signJwt } from '../src/auth/jwt-token';
 import { hashPassword } from '../src/auth/password-hash';
@@ -303,6 +307,43 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
 
       const body = res.body as { message: string };
       expect(body.message).toBe(INVALID_CREDENTIALS_MESSAGE);
+    },
+  );
+
+  it.each<[string, 'same' | 'uppercase' | 'other', number]>([
+    ['da mesma conta', 'same', 429],
+    ['da mesma conta, em maiúsculas e com espaços', 'uppercase', 429],
+    ['de outra conta, vinda do mesmo IP', 'other', 401],
+  ])(
+    'limita o login a 5 tentativas por minuto por conta: a 6ª tentativa %s (%s) responde %s',
+    async (_scenario, emailVariant, expectedStatus) => {
+      const seeded = await seedEmployee();
+      for (
+        let attempt = 0;
+        attempt < MAX_LOGIN_ATTEMPTS_PER_MINUTE;
+        attempt++
+      ) {
+        await request(app.getHttpServer())
+          .post('/auth/login')
+          .send({ email: seeded.email, password: 'SenhaErrada@1' })
+          .expect(401);
+      }
+      const email = {
+        same: seeded.email,
+        uppercase: `  ${seeded.email.toUpperCase()} `,
+        other: `outra-${randomUUID().slice(0, 8)}@eldo.com.br`,
+      }[emailVariant];
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email, password: 'SenhaErrada@1' })
+        .expect(expectedStatus);
+
+      if (expectedStatus === 429) {
+        expect((res.body as { message: string }).message).toBe(
+          TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
+        );
+      }
     },
   );
 

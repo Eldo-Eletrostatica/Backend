@@ -16,6 +16,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -25,6 +26,10 @@ import { AuthenticatedEmployeeDto } from './dto/authenticated-employee.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import {
+  LoginThrottlerGuard,
+  MAX_LOGIN_ATTEMPTS_PER_MINUTE,
+} from './guards/login-throttler.guard';
 import { clearSessionCookies, setSessionCookies } from './session-cookies';
 
 @ApiTags('auth')
@@ -52,6 +57,10 @@ export class AuthController {
   })
   @ApiBadRequestResponse({ description: 'Dados de login inválidos' })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
+  @ApiTooManyRequestsResponse({
+    description: `Mais de ${MAX_LOGIN_ATTEMPTS_PER_MINUTE} tentativas por minuto para a mesma conta`,
+  })
+  @UseGuards(LoginThrottlerGuard)
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) response: Response,

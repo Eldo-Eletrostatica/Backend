@@ -166,6 +166,8 @@ A área interna autentica de dois jeitos, conforme a [ADR 0007](https://eldo-ele
 - **Site (cookie):** o `POST /auth/login` grava o cookie `session`, com o JWT (`HttpOnly`), e o cookie `csrf_token`, legível pelo Frontend, ambos com `SameSite=Strict` e validade de 8 horas. O Frontend chama a API pelo proxy `/api` do próprio site. Em toda escrita (POST, PATCH, PUT ou DELETE), ele manda o valor do `csrf_token` no header `X-CSRF-Token`. Sem o header, ou com outro valor, a API responde 403. O `POST /auth/logout` apaga os dois cookies.
 - **Swagger, testes e outros clientes (Bearer):** o login também devolve o `accessToken` no corpo. Com o header `Authorization: Bearer <token>`, nenhuma rota exige o `X-CSRF-Token`. No Swagger, use o botão **Authorize**.
 
+O login aceita no máximo 5 tentativas por minuto para a mesma conta (e-mail) vinda do mesmo IP. Acima disso, responde 429 até o minuto passar. A contagem é por conta, e não só por IP, porque no site todos os logins chegam pelo proxy do Frontend com o mesmo IP. O contador fica em memória, então volta a zero quando a API reinicia.
+
 Em desenvolvimento, o administrador inicial é `admin@eldo.com.br` com a senha `Admin@123` (variáveis `INITIAL_ADMIN_*`), criado no primeiro login quando ainda não existe nenhum administrador.
 
 ## Rodando localmente sem Docker (alternativa)
