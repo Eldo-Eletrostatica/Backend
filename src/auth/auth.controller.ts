@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -16,15 +17,22 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { findClientIp } from './client-ip';
 import { CurrentEmployee } from './decorators/current-employee.decorator';
 import { AuthenticatedEmployeeDto } from './dto/authenticated-employee.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import {
+  LoginAttemptsService,
+  MAX_LOGIN_ATTEMPTS_PER_ACCOUNT,
+  MAX_LOGIN_ATTEMPTS_PER_IP,
+} from './login-attempts.service';
 import { clearSessionCookies, setSessionCookies } from './session-cookies';
 
 @ApiTags('auth')
@@ -34,6 +42,7 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
+    private readonly loginAttempts: LoginAttemptsService,
     config: ConfigService,
   ) {
     this.isSecureCookie = config.get<string>('NODE_ENV') === 'production';
@@ -52,12 +61,19 @@ export class AuthController {
   })
   @ApiBadRequestResponse({ description: 'Dados de login inválidos' })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
+  @ApiTooManyRequestsResponse({
+    description: `${MAX_LOGIN_ATTEMPTS_PER_ACCOUNT} erros no último minuto para a mesma conta a partir do mesmo IP, ou ${MAX_LOGIN_ATTEMPTS_PER_IP} erros a partir do mesmo IP`,
+  })
   async login(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginResponseDto> {
-    const { accessToken, csrfToken, employee } =
-      await this.authService.login(dto);
+    const { accessToken, csrfToken, employee } = await this.loginAttempts.track(
+      findClientIp(request),
+      dto.email,
+      () => this.authService.login(dto),
+    );
     setSessionCookies(response, accessToken, csrfToken, this.isSecureCookie);
     return { accessToken, employee };
   }

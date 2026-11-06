@@ -166,6 +166,15 @@ A área interna autentica de dois jeitos, conforme a [ADR 0007](https://eldo-ele
 - **Site (cookie):** o `POST /auth/login` grava o cookie `session`, com o JWT (`HttpOnly`), e o cookie `csrf_token`, legível pelo Frontend, ambos com `SameSite=Strict` e validade de 8 horas. O Frontend chama a API pelo proxy `/api` do próprio site. Em toda escrita (POST, PATCH, PUT ou DELETE), ele manda o valor do `csrf_token` no header `X-CSRF-Token`. Sem o header, ou com outro valor, a API responde 403. O `POST /auth/logout` apaga os dois cookies.
 - **Swagger, testes e outros clientes (Bearer):** o login também devolve o `accessToken` no corpo. Com o header `Authorization: Bearer <token>`, nenhuma rota exige o `X-CSRF-Token`. No Swagger, use o botão **Authorize**.
 
+O login tem dois limites de **erros** por minuto. Ao atingir qualquer um deles, responde 429 até o minuto passar:
+
+- **5 erros para a mesma conta (e-mail) vindos do mesmo IP**, contra quem tenta adivinhar a senha de um funcionário. Como o IP entra na conta, quem ataca a partir de outro IP não trava o funcionário verdadeiro.
+- **20 erros vindos do mesmo IP**, em qualquer conta, contra quem testa poucas senhas em muitas contas.
+
+Só a senha errada (401) conta. Um login certo não entra no limite e zera os erros daquela conta naquele IP. Por isso, quem erra algumas vezes e depois acerta não fica bloqueado, e vários funcionários entrando pela mesma rede não gastam o limite do IP.
+
+O IP do visitante vem do último valor do header `X-Forwarded-For`, que o proxy do Frontend acrescenta. Por isso, **em produção a API precisa ficar acessível só pelo proxy**: exposta direto na internet, qualquer um poderia mandar um `X-Forwarded-For` falso e escapar dos limites. O contador fica em memória, então volta a zero quando a API reinicia.
+
 Em desenvolvimento, o administrador inicial é `admin@eldo.com.br` com a senha `Admin@123` (variáveis `INITIAL_ADMIN_*`), criado no primeiro login quando ainda não existe nenhum administrador.
 
 ## Rodando localmente sem Docker (alternativa)
