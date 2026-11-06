@@ -156,6 +156,7 @@ describe('Schema do banco (e2e)', () => {
       INSERT INTO orders (customer_id, seller_employee_id, source, status, final_price, commission, sold_at, tracking_code, scope, due_date)
       SELECT c.customer_id, e.employee_id, 'internal', 'queued', 1000, 50, now(), 'ABC12345', 'Pintura', '2030-01-01'
         FROM customers c, employees e
+       WHERE c.document = '12345678000199' AND e.email = 'vendedor@eldo.com'
     `);
     await expect(queryRunner.query(updateSql)).rejects.toThrow(
       /tracking_code is immutable once set/,
