@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
+import { normalizeEmail } from '../../common/normalize-email';
 
 export const PASSWORD_MAX_LENGTH = 128;
 
@@ -12,7 +13,7 @@ export class LoginDto {
     maxLength: EMAIL_MAX_LENGTH,
   })
   @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toLowerCase() : value,
+    typeof value === 'string' ? normalizeEmail(value) : value,
   )
   @IsEmail({}, { message: 'Informe um e-mail válido.' })
   @MaxLength(EMAIL_MAX_LENGTH)

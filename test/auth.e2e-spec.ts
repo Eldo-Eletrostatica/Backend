@@ -13,7 +13,8 @@ import {
 import { AuthenticatedEmployeeDto } from '../src/auth/dto/authenticated-employee.dto';
 import { CSRF_TOKEN_MISMATCH_MESSAGE } from '../src/auth/guards/jwt-auth.guard';
 import {
-  MAX_LOGIN_ATTEMPTS_PER_MINUTE,
+  MAX_LOGIN_ATTEMPTS_PER_ACCOUNT,
+  MAX_LOGIN_ATTEMPTS_PER_IP,
   TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
 } from '../src/auth/guards/login-throttler.guard';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
@@ -82,12 +83,26 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
     return setCookies.find((cookie) => cookie.startsWith(`${cookieName}=`));
   }
 
+  // A distinct client IP per test, as the Frontend proxy reports it, keeps the
+  // per-IP login limit of one test from affecting the others.
+  function randomClientIp(): string {
+    const octet = () => Math.floor(Math.random() * 254) + 1;
+    return `10.${octet()}.${octet()}.${octet()}`;
+  }
+
+  function postLogin(
+    body: { email: string; password: string },
+    clientIp = randomClientIp(),
+  ): request.Test {
+    return request(app.getHttpServer())
+      .post('/auth/login')
+      .set('X-Forwarded-For', clientIp)
+      .send(body);
+  }
+
   // The cookies as the browser sends them back: only name=value.
   async function login(email: string, password: string): Promise<Session> {
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
+    const res = await postLogin({ email, password }).expect(200);
     const [sessionCookie, csrfCookie] = [SESSION_COOKIE, CSRF_COOKIE].map(
       (cookieName) => (findSetCookie(res, cookieName) ?? '').split(';')[0],
     );
@@ -136,10 +151,10 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
   it('Critério 1: autentica credenciais válidas e permite consultar a sessão em /auth/me', async () => {
     const seeded = await seedEmployee(EmployeeRole.Manager, 'Gestor@2026');
 
-    const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: seeded.email, password: seeded.password })
-      .expect(200);
+    const loginRes = await postLogin({
+      email: seeded.email,
+      password: seeded.password,
+    }).expect(200);
 
     const loginBody = loginRes.body as LoginResponseDto;
     expect(typeof loginBody.accessToken).toBe('string');
@@ -164,10 +179,10 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
     async (cookieName, isHttpOnly) => {
       const seeded = await seedEmployee();
 
-      const loginRes = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: seeded.email, password: seeded.password })
-        .expect(200);
+      const loginRes = await postLogin({
+        email: seeded.email,
+        password: seeded.password,
+      }).expect(200);
 
       const cookie = findSetCookie(loginRes, cookieName);
       expect(cookie).toBeDefined();
@@ -300,50 +315,82 @@ describe('Autenticação de Funcionários (e2e) - US09', () => {
         ? seeded.email
         : `inexistente-${randomUUID().slice(0, 8)}@eldo.com.br`;
 
-      const res = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: emailAttempt, password: passwordAttempt })
-        .expect(401);
+      const res = await postLogin({
+        email: emailAttempt,
+        password: passwordAttempt,
+      }).expect(401);
 
       const body = res.body as { message: string };
       expect(body.message).toBe(INVALID_CREDENTIALS_MESSAGE);
     },
   );
 
-  it.each<[string, 'same' | 'uppercase' | 'other', number]>([
-    ['da mesma conta', 'same', 429],
-    ['da mesma conta, em maiúsculas e com espaços', 'uppercase', 429],
-    ['de outra conta, vinda do mesmo IP', 'other', 401],
+  function randomEmail(): string {
+    return `outra-${randomUUID().slice(0, 8)}@eldo.com.br`;
+  }
+
+  function expectTooManyAttempts(res: request.Response): void {
+    if (res.status === 429) {
+      expect((res.body as { message: string }).message).toBe(
+        TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
+      );
+    }
+  }
+
+  it.each<[string, 'same' | 'uppercase' | 'other', boolean, number]>([
+    ['da mesma conta e do mesmo IP', 'same', true, 429],
+    [
+      'da mesma conta em maiúsculas e com espaços, do mesmo IP',
+      'uppercase',
+      true,
+      429,
+    ],
+    ['de outra conta, do mesmo IP', 'other', true, 401],
+    ['da mesma conta, de outro IP', 'same', false, 401],
   ])(
-    'limita o login a 5 tentativas por minuto por conta: a 6ª tentativa %s (%s) responde %s',
-    async (_scenario, emailVariant, expectedStatus) => {
+    'limita o login a 5 tentativas por minuto por conta e IP: a 6ª tentativa %s (%s, mesmo IP: %s) responde %s',
+    async (_scenario, emailVariant, isSameIp, expectedStatus) => {
       const seeded = await seedEmployee();
-      for (
-        let attempt = 0;
-        attempt < MAX_LOGIN_ATTEMPTS_PER_MINUTE;
-        attempt++
-      ) {
-        await request(app.getHttpServer())
-          .post('/auth/login')
-          .send({ email: seeded.email, password: 'SenhaErrada@1' })
-          .expect(401);
+      const attackerIp = randomClientIp();
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS_PER_ACCOUNT; i++) {
+        await postLogin(
+          { email: seeded.email, password: 'SenhaErrada@1' },
+          attackerIp,
+        ).expect(401);
       }
       const email = {
         same: seeded.email,
         uppercase: `  ${seeded.email.toUpperCase()} `,
-        other: `outra-${randomUUID().slice(0, 8)}@eldo.com.br`,
+        other: randomEmail(),
       }[emailVariant];
 
-      const res = await request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email, password: 'SenhaErrada@1' })
-        .expect(expectedStatus);
+      const res = await postLogin(
+        { email, password: 'SenhaErrada@1' },
+        isSameIp ? attackerIp : randomClientIp(),
+      ).expect(expectedStatus);
+      expectTooManyAttempts(res);
+    },
+  );
 
-      if (expectedStatus === 429) {
-        expect((res.body as { message: string }).message).toBe(
-          TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
-        );
+  it.each([
+    ['do mesmo IP', true, 429],
+    ['de outro IP', false, 401],
+  ])(
+    'limita o login a 20 tentativas por minuto por IP, em contas diferentes: a 21ª tentativa %s (%s) responde %s',
+    async (_scenario, isSameIp, expectedStatus) => {
+      const attackerIp = randomClientIp();
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS_PER_IP; i++) {
+        await postLogin(
+          { email: randomEmail(), password: 'SenhaErrada@1' },
+          attackerIp,
+        ).expect(401);
       }
+
+      const res = await postLogin(
+        { email: randomEmail(), password: 'SenhaErrada@1' },
+        isSameIp ? attackerIp : randomClientIp(),
+      ).expect(expectedStatus);
+      expectTooManyAttempts(res);
     },
   );
 

@@ -28,7 +28,8 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
   LoginThrottlerGuard,
-  MAX_LOGIN_ATTEMPTS_PER_MINUTE,
+  MAX_LOGIN_ATTEMPTS_PER_ACCOUNT,
+  MAX_LOGIN_ATTEMPTS_PER_IP,
 } from './guards/login-throttler.guard';
 import { clearSessionCookies, setSessionCookies } from './session-cookies';
 
@@ -58,7 +59,7 @@ export class AuthController {
   @ApiBadRequestResponse({ description: 'Dados de login inválidos' })
   @ApiUnauthorizedResponse({ description: 'E-mail ou senha inválidos' })
   @ApiTooManyRequestsResponse({
-    description: `Mais de ${MAX_LOGIN_ATTEMPTS_PER_MINUTE} tentativas por minuto para a mesma conta`,
+    description: `Mais de ${MAX_LOGIN_ATTEMPTS_PER_ACCOUNT} tentativas por minuto para a mesma conta a partir do mesmo IP, ou mais de ${MAX_LOGIN_ATTEMPTS_PER_IP} a partir do mesmo IP`,
   })
   @UseGuards(LoginThrottlerGuard)
   async login(
