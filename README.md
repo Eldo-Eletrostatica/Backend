@@ -171,6 +171,16 @@ No desenvolvimento e nos testes, o servidor de e-mail é o **Mailpit**, que sobe
 
 Em produção, configure as variáveis `SMTP_*` com o e-mail do cliente (por exemplo, o Gmail ou o Google Workspace da empresa, com uma senha de app) e o `CONTACT_NOTIFICATION_EMAIL` com o endereço que deve receber os avisos.
 
+### Proteção contra spam
+
+O formulário de contato e o de orçamento são públicos, então um script pode tentar inundar o banco ou a caixa de entrada da empresa. Há três camadas, todas em memória, que voltam a zero quando a API reinicia:
+
+- **Limite por IP:** 5 contatos e 10 orçamentos (somando simulador e PDF) por hora para cada IP. Acima disso, a API responde 429. O IP é o do visitante, vindo do `X-Forwarded-For` do proxy do Frontend, como no login. O limite roda antes da validação e do upload, então um script bloqueado nem envia o PDF.
+- **Honeypot no contato:** o site manda um campo `website` escondido, que pessoas não veem. Quando ele chega preenchido, a API responde como sucesso, mas não grava nem avisa. Fica fora do Swagger.
+- **Teto de avisos:** no máximo 20 e-mails de aviso por hora para a empresa. Acima disso, o contato é gravado e aparece na área interna, mas sem e-mail. Vale mesmo contra um ataque espalhado por muitos IPs.
+
+Se isso não bastar em produção, o próximo passo é um CAPTCHA, como o Cloudflare Turnstile.
+
 ## Autenticação
 
 A área interna autentica de dois jeitos, conforme a [ADR 0007](https://eldo-eletrostatica.github.io/Documentacao/adr/0007-autenticacao-por-cookie/):

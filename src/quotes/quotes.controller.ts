@@ -27,6 +27,10 @@ import { EstimatorOptionsDto } from './dto/estimator-options.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
 import { MAX_QUOTE_PDF_BYTES } from './quote-pdf';
 import { QuotesService } from './quotes.service';
+import {
+  LimitPublicForm,
+  MAX_QUOTE_REQUESTS_PER_HOUR,
+} from '../common/public-form-rate-limit';
 
 // Public quote form for business customers (US07).
 @ApiTags('quotes')
@@ -46,6 +50,7 @@ export class QuotesController {
   }
 
   @Post('estimator')
+  @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Pede um orçamento pelo simulador',
     description:
@@ -67,6 +72,7 @@ export class QuotesController {
   }
 
   @Post('pdf')
+  @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Pede um orçamento enviando o projeto em PDF',
     description:

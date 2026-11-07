@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   Injectable,
@@ -38,6 +39,9 @@ export class ContactRequestsService {
   async create(
     dto: CreateContactRequestDto,
   ): Promise<ContactRequestResponseDto> {
+    if (dto.website) {
+      return toIgnoredResponse(dto);
+    }
     const contactRequest = await this.dataSource.transaction(
       async (manager) => {
         const customer = await manager.save(
@@ -109,5 +113,22 @@ function toResponse(order: Order): ContactRequestResponseDto {
     phone: order.customer.phone,
     message: order.customerMessage ?? '',
     createdAt: order.createdAt,
+  };
+}
+
+// The answer a script gets when it fills in the honeypot: it looks like any
+// other success, so the script has no sign that it was caught, but nothing is
+// saved and no one is notified.
+function toIgnoredResponse(
+  dto: CreateContactRequestDto,
+): ContactRequestResponseDto {
+  return {
+    orderId: randomUUID(),
+    status: OrderStatus.Requested,
+    name: dto.name,
+    email: dto.email,
+    phone: dto.phone,
+    message: dto.message,
+    createdAt: new Date(),
   };
 }

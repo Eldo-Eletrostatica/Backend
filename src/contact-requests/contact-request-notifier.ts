@@ -1,7 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FixedWindowCounter } from '../common/fixed-window-counter';
 import { MailService } from '../mail/mail.service';
 import { ContactRequestResponseDto } from './dto/contact-request-response.dto';
+
+// A ceiling for the company's inbox: past it, new contacts are still saved and
+// listed in the internal area, but without an email. It holds even against a
+// flood spread over many IPs, which the per-IP form limit does not stop.
+export const MAX_CONTACT_NOTIFICATIONS_PER_HOUR = 20;
+const NOTIFICATION_WINDOW_MS = 60 * 60 * 1000;
+const NOTIFICATION_KEY = 'contact-notifications';
 
 // (61) 99999-8888 for mobiles and (61) 3333-4444 for landlines.
 function formatPhone(digits: string): string {
@@ -16,6 +24,9 @@ function formatPhone(digits: string): string {
 export class ContactRequestNotifier {
   private readonly logger = new Logger(ContactRequestNotifier.name);
   private readonly notificationEmail: string | undefined;
+  private readonly notificationsSent = new FixedWindowCounter(
+    NOTIFICATION_WINDOW_MS,
+  );
 
   constructor(
     private readonly mailService: MailService,
@@ -29,6 +40,16 @@ export class ContactRequestNotifier {
   // change what the visitor sees (US28 criterion 2).
   async notify(contactRequest: ContactRequestResponseDto): Promise<void> {
     if (!this.notificationEmail) return;
+    if (
+      this.notificationsSent.count(NOTIFICATION_KEY) >=
+      MAX_CONTACT_NOTIFICATIONS_PER_HOUR
+    ) {
+      this.logger.warn(
+        `Limite de ${MAX_CONTACT_NOTIFICATIONS_PER_HOUR} avisos por hora atingido; o contato ${contactRequest.orderId} fica só na área interna`,
+      );
+      return;
+    }
+    this.notificationsSent.increment(NOTIFICATION_KEY);
     try {
       await this.mailService.send({
         to: this.notificationEmail,
