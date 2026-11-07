@@ -12,7 +12,11 @@ import {
   PHONE_MAX_LENGTH,
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
-import { IsBrazilianPhone, IsCompanyName } from '../../common/contact-fields';
+import {
+  INVALID_EMAIL_MESSAGE,
+  IsBrazilianPhone,
+  IsCompanyName,
+} from '../../common/contact-fields';
 
 // 14 digits, without punctuation.
 const CNPJ_PATTERN = /^\d{14}$/;
@@ -35,7 +39,8 @@ export class QuoteCustomerDto {
   cnpj: string;
 
   @ApiProperty({ maxLength: EMAIL_MAX_LENGTH })
-  @IsEmail()
+  @IsNotEmpty()
+  @IsEmail({}, { message: INVALID_EMAIL_MESSAGE })
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 

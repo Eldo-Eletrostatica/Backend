@@ -9,6 +9,7 @@ import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { hashPassword } from '../src/auth/password-hash';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
 import {
+  INVALID_EMAIL_MESSAGE,
   INVALID_PERSON_NAME_MESSAGE,
   INVALID_PHONE_MESSAGE,
 } from '../src/common/contact-fields';
@@ -198,7 +199,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
 
         expect(res.status).toBe(400);
         expect((res.body as { message: string[] }).message).toEqual([
-          'email must be an email',
+          INVALID_EMAIL_MESSAGE,
         ]);
       },
     );

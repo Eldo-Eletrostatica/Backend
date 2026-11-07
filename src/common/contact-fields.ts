@@ -3,6 +3,8 @@ import { Matches, MinLength } from 'class-validator';
 
 export const INVALID_PHONE_MESSAGE =
   'Informe um telefone com DDD, como (61) 99999-9999.';
+export const INVALID_EMAIL_MESSAGE =
+  'Informe um e-mail válido, como nome@email.com.';
 export const INVALID_PERSON_NAME_MESSAGE =
   'Use só letras, espaços, apóstrofo ou hífen no nome.';
 export const INVALID_COMPANY_NAME_MESSAGE =

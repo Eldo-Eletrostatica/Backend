@@ -6,7 +6,11 @@ import {
   PHONE_MAX_LENGTH,
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
-import { IsBrazilianPhone, IsPersonName } from '../../common/contact-fields';
+import {
+  INVALID_EMAIL_MESSAGE,
+  IsBrazilianPhone,
+  IsPersonName,
+} from '../../common/contact-fields';
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
 
@@ -22,7 +26,8 @@ export class CreateContactRequestDto {
   name: string;
 
   @ApiProperty({ example: 'maria@email.com', maxLength: EMAIL_MAX_LENGTH })
-  @IsEmail()
+  @IsNotEmpty()
+  @IsEmail({}, { message: INVALID_EMAIL_MESSAGE })
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 
