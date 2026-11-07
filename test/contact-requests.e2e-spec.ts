@@ -8,6 +8,10 @@ import { AppModule } from '../src/app.module';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { hashPassword } from '../src/auth/password-hash';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
+import {
+  INVALID_PERSON_NAME_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+} from '../src/common/contact-fields';
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
 
 const PASSWORD = 'Password@123';
@@ -137,6 +141,52 @@ describe('Formulário de contato PF (e2e) - US06', () => {
         );
       },
     );
+
+    it.each([
+      ['curto demais', '6199999'],
+      ['com DDD começando por 0', '01999999999'],
+      ['celular de 11 dígitos sem o 9', '61899999999'],
+      ['com letras', '6199999abcd'],
+      ['com máscara em vez de só dígitos', '(61) 99999-9999'],
+    ])(
+      'Critério 2: recusa um telefone %s (%s) com a mensagem do formato',
+      async (_, phone) => {
+        const res = await sendContactForm(contactForm({ phone }));
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          INVALID_PHONE_MESSAGE,
+        ]);
+      },
+    );
+
+    it.each([
+      ['com número', 'Maria 2'],
+      ['com símbolo', 'Maria@Souza'],
+      ['com uma letra só', 'M'],
+      ['terminando em hífen', 'Maria-'],
+    ])(
+      'Critério 2: recusa um nome %s (%s) com a mensagem do formato',
+      async (_, name) => {
+        const res = await sendContactForm(contactForm({ name }));
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          INVALID_PERSON_NAME_MESSAGE,
+        ]);
+      },
+    );
+
+    it.each([
+      ['telefone fixo de 10 dígitos', { phone: '6133334444' }],
+      ['celular de 11 dígitos', { phone: '61999998888' }],
+      ['nome com acento e apóstrofo', { name: "Joana D'Ávila" }],
+      ['nome composto com hífen', { name: 'Ana-Clara Souza' }],
+    ])('Critério 1: aceita %s: %j', async (_, overrides) => {
+      const res = await sendContactForm(contactForm(overrides));
+
+      expect(res.status).toBe(201);
+    });
 
     it.each([
       ['sem arroba', 'maria.email.com'],
