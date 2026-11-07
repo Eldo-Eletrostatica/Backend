@@ -16,6 +16,7 @@ import { ContactRequestResponseDto } from './dto/contact-request-response.dto';
 import { CreateContactRequestDto } from './dto/create-contact-request.dto';
 import { ListContactRequestsQueryDto } from './dto/list-contact-requests-query.dto';
 import { UpdateContactRequestStatusDto } from './dto/update-contact-request-status.dto';
+import { ContactRequestNotifier } from './contact-request-notifier';
 
 export const CONTACT_REQUEST_NOT_FOUND_MESSAGE =
   'Solicitação de contato não encontrada.';
@@ -28,6 +29,7 @@ export class ContactRequestsService {
     private readonly dataSource: DataSource,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    private readonly notifier: ContactRequestNotifier,
   ) {}
 
   // The contact request is an order with source contact (ADR 0005). The
@@ -36,25 +38,31 @@ export class ContactRequestsService {
   async create(
     dto: CreateContactRequestDto,
   ): Promise<ContactRequestResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const customer = await manager.save(
-        manager.create(Customer, {
-          type: CustomerType.Individual,
-          name: dto.name,
-          email: dto.email,
-          phone: dto.phone,
-        }),
-      );
-      const order = await manager.save(
-        manager.create(Order, {
-          customerId: customer.customerId,
-          source: OrderSource.Contact,
-          status: OrderStatus.Requested,
-          customerMessage: dto.message,
-        }),
-      );
-      return toResponse(Object.assign(order, { customer }));
-    });
+    const contactRequest = await this.dataSource.transaction(
+      async (manager) => {
+        const customer = await manager.save(
+          manager.create(Customer, {
+            type: CustomerType.Individual,
+            name: dto.name,
+            email: dto.email,
+            phone: dto.phone,
+          }),
+        );
+        const order = await manager.save(
+          manager.create(Order, {
+            customerId: customer.customerId,
+            source: OrderSource.Contact,
+            status: OrderStatus.Requested,
+            customerMessage: dto.message,
+          }),
+        );
+        return toResponse(Object.assign(order, { customer }));
+      },
+    );
+    // Not awaited: the visitor gets the confirmation without waiting for the
+    // SMTP server, and the notifier handles its own failures.
+    void this.notifier.notify(contactRequest);
+    return contactRequest;
   }
 
   // Newest first, so the team sees the requests still waiting at the top.

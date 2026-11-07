@@ -48,6 +48,11 @@ jobs:
       S3_SECRET_ACCESS_KEY: eldo-dev-secret
       S3_PUBLIC_URL: http://localhost:8333/eldo
       JWT_SECRET: eldo-dev-jwt-secret
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
+      SMTP_FROM: Site Eldo <site@eldo.local>
+      CONTACT_NOTIFICATION_EMAIL: contato@eldo.local
+      MAILPIT_API_URL: http://localhost:8025
 
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +73,7 @@ jobs:
 
       # Service containers cannot mount repository files, so the S3 storage
       # starts from the compose file, which also creates the bucket.
-      - run: docker compose up -d --wait seaweedfs
+      - run: docker compose up -d --wait seaweedfs mailpit
       - run: docker compose run --rm seaweedfs-setup
 
       - run: npm run test:e2e

@@ -3,12 +3,14 @@ import { CustomersModule } from '../customers/customers.module';
 import { OrdersModule } from '../orders/orders.module';
 import { ContactRequestsController } from './contact-requests.controller';
 import { ContactRequestsService } from './contact-requests.service';
+import { MailModule } from '../mail/mail.module';
+import { ContactRequestNotifier } from './contact-request-notifier';
 
 // A contact request is the first stage of an order (ADR 0005): this module
 // writes orders and the individual customer who sent the form.
 @Module({
-  imports: [OrdersModule, CustomersModule],
+  imports: [OrdersModule, CustomersModule, MailModule],
   controllers: [ContactRequestsController],
-  providers: [ContactRequestsService],
+  providers: [ContactRequestsService, ContactRequestNotifier],
 })
 export class ContactRequestsModule {}

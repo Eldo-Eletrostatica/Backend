@@ -49,6 +49,10 @@ Variáveis disponíveis (`.env.example`):
 | `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial provisionado no primeiro login |
 | `CORS_ORIGINS` | Origens liberadas no CORS, separadas por vírgula (padrão `http://localhost:3000`). O site usa o proxy do Frontend e não depende do CORS (ver [Autenticação](#autenticação)) |
 | `NODE_ENV` | Com `production`, os cookies de sessão saem com `Secure`, e o site precisa de HTTPS |
+| `SMTP_HOST`, `SMTP_PORT` | Servidor de e-mail (SMTP). No Docker Compose, o Mailpit (`mailpit:1025`); em produção, o SMTP do e-mail do cliente. Sem `SMTP_HOST`, nenhum e-mail é enviado |
+| `SMTP_USER`, `SMTP_PASSWORD` | Usuário e senha do SMTP. Vazios no Mailpit |
+| `SMTP_FROM` | Remetente dos e-mails, como `Site Eldo <site@dominio.com.br>` |
+| `CONTACT_NOTIFICATION_EMAIL` | Quem recebe o aviso de contato novo pelo site (US28). Vazio, o aviso não é enviado e o contato fica só na área interna |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
@@ -158,6 +162,14 @@ Para ligar o Google de verdade:
 4. Em **APIs e serviços › Cotas**, defina uma cota diária para a Places API, como segunda proteção de custo.
 5. Pegue o Place ID da Eldo no [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id). Ele começa com `ChIJ`.
 6. No servidor, configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID` e `USE_SAMPLE_REVIEWS=false`.
+
+## E-mail de aviso de contato
+
+Quando um visitante envia o formulário de contato (US06), o Backend registra o contato e manda um aviso para `CONTACT_NOTIFICATION_EMAIL` (US28), com o nome, o telefone, o e-mail e a mensagem. O `Reply-To` é o e-mail do visitante, então quem recebe o aviso responde direto. O envio acontece depois da resposta ao visitante: se o SMTP falhar, o contato continua registrado e a falha só aparece no log.
+
+No desenvolvimento e nos testes, o servidor de e-mail é o **Mailpit**, que sobe no `docker compose`: ele guarda os e-mails em vez de entregar, com a caixa de entrada em [http://localhost:8025](http://localhost:8025). Os testes de integração conferem o aviso pela API dele.
+
+Em produção, configure as variáveis `SMTP_*` com o e-mail do cliente (por exemplo, o Gmail ou o Google Workspace da empresa, com uma senha de app) e o `CONTACT_NOTIFICATION_EMAIL` com o endereço que deve receber os avisos.
 
 ## Autenticação
 
