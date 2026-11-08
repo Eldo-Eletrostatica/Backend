@@ -147,6 +147,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
       ['curto demais', '6199999'],
       ['com DDD começando por 0', '01999999999'],
       ['celular de 11 dígitos sem o 9', '61899999999'],
+      ['celular incompleto de 10 dígitos começando por 9', '6199998888'],
       ['com letras', '6199999abcd'],
       ['com máscara em vez de só dígitos', '(61) 99999-9999'],
     ])(
@@ -182,6 +183,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
       ['telefone fixo de 10 dígitos', { phone: '6133334444' }],
       ['celular de 11 dígitos', { phone: '61999998888' }],
       ['nome com acento e apóstrofo', { name: "Joana D'Ávila" }],
+      ['nome com apóstrofo tipográfico', { name: 'Joana D’Ávila' }],
       ['nome composto com hífen', { name: 'Ana-Clara Souza' }],
     ])('Critério 1: aceita %s: %j', async (_, overrides) => {
       const res = await sendContactForm(contactForm(overrides));

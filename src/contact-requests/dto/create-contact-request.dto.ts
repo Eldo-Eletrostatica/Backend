@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { TrimString } from '../../common/trim-string';
 import {
   CUSTOMER_NAME_MAX_LENGTH,
@@ -7,9 +11,9 @@ import {
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
 import {
-  INVALID_EMAIL_MESSAGE,
   IsBrazilianPhone,
-  IsPersonName,
+  IsCustomerEmail,
+  IsIndividualCustomerName,
 } from '../../common/contact-fields';
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
@@ -22,12 +26,11 @@ export class CreateContactRequestDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(CUSTOMER_NAME_MAX_LENGTH)
-  @IsPersonName()
+  @IsIndividualCustomerName()
   name: string;
 
   @ApiProperty({ example: 'maria@email.com', maxLength: EMAIL_MAX_LENGTH })
-  @IsNotEmpty()
-  @IsEmail({}, { message: INVALID_EMAIL_MESSAGE })
+  @IsCustomerEmail()
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 

@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsNotEmpty,
   IsString,
   Matches,
@@ -13,9 +12,9 @@ import {
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
 import {
-  INVALID_EMAIL_MESSAGE,
   IsBrazilianPhone,
-  IsCompanyName,
+  IsBusinessCustomerName,
+  IsCustomerEmail,
 } from '../../common/contact-fields';
 
 // 14 digits, without punctuation.
@@ -31,7 +30,7 @@ export class QuoteCustomerDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(CUSTOMER_NAME_MAX_LENGTH)
-  @IsCompanyName()
+  @IsBusinessCustomerName()
   name: string;
 
   @ApiProperty({ example: '12345678000199', description: 'Só dígitos' })
@@ -39,8 +38,7 @@ export class QuoteCustomerDto {
   cnpj: string;
 
   @ApiProperty({ maxLength: EMAIL_MAX_LENGTH })
-  @IsNotEmpty()
-  @IsEmail({}, { message: INVALID_EMAIL_MESSAGE })
+  @IsCustomerEmail()
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 
