@@ -40,13 +40,16 @@ describe('contact-fields (unit)', () => {
       ['celular incompleto de 10 dígitos começando por 9', '6199998888'],
       ['com máscara', '(61) 99999-9999'],
       ['com letras', '6199999abcd'],
-    ])('recusa telefone inválido por motivo de %s: %s', async (_reason, phone) => {
-      const dto = plainToInstance(TestPhoneDto, { phone });
-      const errors = await validate(dto);
+    ])(
+      'recusa telefone inválido por motivo de %s: %s',
+      async (_reason, phone) => {
+        const dto = plainToInstance(TestPhoneDto, { phone });
+        const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.matches).toBe(INVALID_PHONE_MESSAGE);
-    });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].constraints?.matches).toBe(INVALID_PHONE_MESSAGE);
+      },
+    );
 
     it.each([
       ['celular de 11 dígitos', '61999998888'],
@@ -67,42 +70,51 @@ describe('contact-fields (unit)', () => {
       ['com símbolo arroba', 'Maria@Souza'],
       ['terminando em hífen', 'Maria-'],
       ['começando em hífen', '-Maria'],
-    ])('recusa nome individual inválido por motivo de %s: %s', async (_reason, name) => {
-      const dto = plainToInstance(TestIndividualCustomerNameDto, { name });
-      const errors = await validate(dto);
+    ])(
+      'recusa nome individual inválido por motivo de %s: %s',
+      async (_reason, name) => {
+        const dto = plainToInstance(TestIndividualCustomerNameDto, { name });
+        const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.matches).toBe(
-        INVALID_INDIVIDUAL_CUSTOMER_NAME_MESSAGE,
-      );
-    });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].constraints?.matches).toBe(
+          INVALID_INDIVIDUAL_CUSTOMER_NAME_MESSAGE,
+        );
+      },
+    );
 
     it.each([
       ['nome simples com espaço', 'Maria Souza'],
       ['nome com acento e apóstrofo ASCII', "Joana D'Ávila"],
       ['nome com apóstrofo tipográfico', 'Joana D’Ávila'],
       ['nome composto com hífen', 'Ana-Clara Souza'],
-    ])('aceita nome individual válido no caso %s: %s', async (_reason, name) => {
-      const dto = plainToInstance(TestIndividualCustomerNameDto, { name });
-      const errors = await validate(dto);
+    ])(
+      'aceita nome individual válido no caso %s: %s',
+      async (_reason, name) => {
+        const dto = plainToInstance(TestIndividualCustomerNameDto, { name });
+        const errors = await validate(dto);
 
-      expect(errors).toHaveLength(0);
-    });
+        expect(errors).toHaveLength(0);
+      },
+    );
   });
 
   describe('IsBusinessCustomerName', () => {
     it.each([
       ['com uma letra só', 'A'],
       ['vazio', ''],
-    ])('recusa razão social curta demais por motivo de %s: %s', async (_reason, name) => {
-      const dto = plainToInstance(TestBusinessCustomerNameDto, { name });
-      const errors = await validate(dto);
+    ])(
+      'recusa razão social curta demais por motivo de %s: %s',
+      async (_reason, name) => {
+        const dto = plainToInstance(TestBusinessCustomerNameDto, { name });
+        const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.minLength).toBe(
-        INVALID_BUSINESS_CUSTOMER_NAME_MESSAGE,
-      );
-    });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].constraints?.minLength).toBe(
+          INVALID_BUSINESS_CUSTOMER_NAME_MESSAGE,
+        );
+      },
+    );
 
     it.each([
       ['razão social de 2 caracteres', 'Oi'],
@@ -120,13 +132,16 @@ describe('contact-fields (unit)', () => {
       ['sem arroba', 'maria.email.com'],
       ['sem domínio', 'maria@'],
       ['sem usuário', '@email.com'],
-    ])('recusa e-mail inválido por motivo de %s: %s', async (_reason, email) => {
-      const dto = plainToInstance(TestCustomerEmailDto, { email });
-      const errors = await validate(dto);
+    ])(
+      'recusa e-mail inválido por motivo de %s: %s',
+      async (_reason, email) => {
+        const dto = plainToInstance(TestCustomerEmailDto, { email });
+        const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].constraints?.isEmail).toBe(INVALID_EMAIL_MESSAGE);
-    });
+        expect(errors).toHaveLength(1);
+        expect(errors[0].constraints?.isEmail).toBe(INVALID_EMAIL_MESSAGE);
+      },
+    );
 
     it.each([
       ['e-mail corporativo', 'contato@metalurgica.com.br'],
@@ -139,4 +154,3 @@ describe('contact-fields (unit)', () => {
     });
   });
 });
-
