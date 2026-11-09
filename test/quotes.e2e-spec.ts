@@ -17,6 +17,13 @@ interface EstimatorSettingsRow {
   negotiation_margin: string;
 }
 
+// Each form submission comes from a different visitor, as the Frontend proxy
+// reports it, so the per-IP form limit does not add up across tests.
+function randomClientIp(): string {
+  const octet = () => randomInt(1, 255);
+  return `10.${octet()}.${octet()}.${octet()}`;
+}
+
 describe('Orçamento PJ (e2e) - US07', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
@@ -135,6 +142,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
   async function requestEstimate(body: Record<string, unknown>) {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
+      .set('X-Forwarded-For', randomClientIp())
       .send(body);
     const quote = res.body as QuoteResponseDto;
     if (res.status === 201) {
@@ -147,6 +155,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
     const fields = customer();
     return request(app.getHttpServer())
       .post('/quotes/pdf')
+      .set('X-Forwarded-For', randomClientIp())
       .field('name', fields.name)
       .field('cnpj', fields.cnpj)
       .field('email', fields.email)

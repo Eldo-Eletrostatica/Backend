@@ -13,6 +13,7 @@ import {
   CONTACT_REQUEST_NOT_FOUND_MESSAGE,
   ContactRequestsService,
 } from './contact-requests.service';
+import { ContactRequestNotifier } from './contact-request-notifier';
 
 const ORDER_ID = '3f2b8c1e-4a5d-4e6f-8a9b-0c1d2e3f4a5b';
 
@@ -45,6 +46,7 @@ describe('ContactRequestsService', () => {
         ContactRequestsService,
         { provide: DataSource, useValue: {} },
         { provide: getRepositoryToken(Order), useValue: { findOne, save } },
+        { provide: ContactRequestNotifier, useValue: { notify: jest.fn() } },
       ],
     }).compile();
 
