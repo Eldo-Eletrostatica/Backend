@@ -8,7 +8,7 @@ import { AppModule } from '../src/app.module';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
 
 const MAILPIT_API_URL = process.env.MAILPIT_API_URL ?? 'http://localhost:8025';
-const NOTIFICATION_EMAIL = process.env.CONTACT_NOTIFICATION_EMAIL ?? '';
+const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL ?? '';
 // The email is sent after the response, so the test waits for it to arrive.
 const EMAIL_WAIT_MS = 5000;
 const NO_EMAIL_WAIT_MS = 2000;
@@ -136,7 +136,7 @@ describe('Aviso por e-mail de contato novo (e2e) - US28', () => {
   });
 
   it.each([
-    ['sem endereço de aviso configurado', { CONTACT_NOTIFICATION_EMAIL: '' }],
+    ['sem endereço de aviso configurado', { NOTIFICATION_EMAIL: '' }],
     ['com o servidor de e-mail fora do ar', { SMTP_PORT: '1' }],
   ])(
     'Critérios 2 e 3: %s, registra o contato e não envia e-mail: %j',

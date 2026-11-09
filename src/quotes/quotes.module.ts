@@ -6,6 +6,8 @@ import { SiteSettingsModule } from '../site-settings/site-settings.module';
 import { StorageModule } from '../storage/storage.module';
 import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
+import { MailModule } from '../mail/mail.module';
+import { QuoteNotifier } from './quote-notifier';
 
 // A quote is a stage of the order (ADR 0005): this module writes orders,
 // order items and customers, and reads the catalog and the estimator settings.
@@ -16,8 +18,9 @@ import { QuotesService } from './quotes.service';
     CatalogItemsModule,
     SiteSettingsModule,
     StorageModule,
+    MailModule,
   ],
   controllers: [QuotesController],
-  providers: [QuotesService],
+  providers: [QuotesService, QuoteNotifier],
 })
 export class QuotesModule {}

@@ -5,7 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
-import { MAX_CONTACT_NOTIFICATIONS_PER_HOUR } from '../src/contact-requests/contact-request-notifier';
+import { MAX_COMPANY_NOTIFICATIONS_PER_HOUR } from '../src/mail/company-notifier';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
 import {
   MAX_CONTACT_REQUESTS_PER_HOUR,
@@ -153,9 +153,9 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
     },
   );
 
-  it(`avisa a Eldo de no máximo ${MAX_CONTACT_NOTIFICATIONS_PER_HOUR} contatos por hora, mas grava todos`, async () => {
+  it(`avisa a Eldo de no máximo ${MAX_COMPANY_NOTIFICATIONS_PER_HOUR} contatos por hora, mas grava todos`, async () => {
     const batch = randomLetters(8);
-    const total = MAX_CONTACT_NOTIFICATIONS_PER_HOUR + 2;
+    const total = MAX_COMPANY_NOTIFICATIONS_PER_HOUR + 2;
     for (let i = 0; i < total; i++) {
       const res = await sendContactForm(randomClientIp(), {
         name: `Lote ${batch} ${randomLetters(4)}`,
@@ -166,7 +166,7 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
     const deadline = Date.now() + EMAIL_WAIT_MS;
     let emails = await countEmails(batch);
     while (
-      emails < MAX_CONTACT_NOTIFICATIONS_PER_HOUR &&
+      emails < MAX_COMPANY_NOTIFICATIONS_PER_HOUR &&
       Date.now() < deadline
     ) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
@@ -174,7 +174,7 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    expect(await countEmails(batch)).toBe(MAX_CONTACT_NOTIFICATIONS_PER_HOUR);
+    expect(await countEmails(batch)).toBe(MAX_COMPANY_NOTIFICATIONS_PER_HOUR);
     const [{ count }] = await dataSource.query<{ count: string }[]>(
       'SELECT count(*) FROM customers WHERE name LIKE $1',
       [`Lote ${batch} %`],

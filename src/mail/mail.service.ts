@@ -2,11 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createTransport, type Transporter } from 'nodemailer';
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 export interface PlainTextEmail {
   to: string;
   replyTo?: string;
   subject: string;
   text: string;
+  attachments?: EmailAttachment[];
 }
 
 // Sends email by SMTP. In production each client uses its own email account
