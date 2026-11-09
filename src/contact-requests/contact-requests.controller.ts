@@ -27,6 +27,10 @@ import { ContactRequestResponseDto } from './dto/contact-request-response.dto';
 import { CreateContactRequestDto } from './dto/create-contact-request.dto';
 import { ListContactRequestsQueryDto } from './dto/list-contact-requests-query.dto';
 import { UpdateContactRequestStatusDto } from './dto/update-contact-request-status.dto';
+import {
+  LimitPublicForm,
+  MAX_CONTACT_REQUESTS_PER_HOUR,
+} from '../common/public-form-rate-limit';
 
 // Contact form of individual customers (US06). Sending is public; listing and
 // marking as handled are for any employee of the team.
@@ -38,6 +42,7 @@ export class ContactRequestsController {
   ) {}
 
   @Post()
+  @LimitPublicForm('contact-request', MAX_CONTACT_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Envia o formulário de contato',
     description:

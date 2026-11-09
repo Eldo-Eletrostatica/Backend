@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { TrimString } from '../../common/trim-string';
 import {
   CUSTOMER_NAME_MAX_LENGTH,
@@ -13,6 +13,7 @@ import {
 } from '../../common/contact-fields';
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
+const HONEYPOT_MAX_LENGTH = 500;
 
 // Contact form of an individual customer (US06): no CPF, the team answers by
 // WhatsApp.
@@ -52,4 +53,12 @@ export class CreateContactRequestDto {
   @IsNotEmpty()
   @MaxLength(CONTACT_MESSAGE_MAX_LENGTH)
   message: string;
+
+  // Honeypot: the site hides this field from people, so only a script fills
+  // it in. Left out of the API docs so it does not advertise itself.
+  @ApiHideProperty()
+  @IsOptional()
+  @IsString()
+  @MaxLength(HONEYPOT_MAX_LENGTH)
+  website?: string;
 }

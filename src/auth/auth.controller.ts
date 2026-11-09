@@ -22,7 +22,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { findClientIp } from './client-ip';
+import { findClientIp } from '../common/client-ip';
 import { CurrentEmployee } from './decorators/current-employee.decorator';
 import { AuthenticatedEmployeeDto } from './dto/authenticated-employee.dto';
 import { LoginResponseDto } from './dto/login-response.dto';

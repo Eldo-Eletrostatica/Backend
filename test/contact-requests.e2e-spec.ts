@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -16,6 +16,13 @@ import {
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
 
 const PASSWORD = 'Password@123';
+
+// Each form submission comes from a different visitor, as the Frontend proxy
+// reports it, so the per-IP form limit does not add up across tests.
+function randomClientIp(): string {
+  const octet = () => randomInt(1, 255);
+  return `10.${octet()}.${octet()}.${octet()}`;
+}
 
 describe('Formulário de contato PF (e2e) - US06', () => {
   let app: INestApplication<App>;
@@ -86,6 +93,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
   async function sendContactForm(body: Record<string, unknown>) {
     const res = await request(app.getHttpServer())
       .post('/contact-requests')
+      .set('X-Forwarded-For', randomClientIp())
       .send(body);
     if (res.status === 201) {
       created.orderIds.push((res.body as ContactRequestResponseDto).orderId);

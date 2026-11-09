@@ -42,6 +42,20 @@ services:
       seaweedfs:
         condition: service_healthy
 
+  # Fake SMTP server for development and tests (US28): it keeps every email
+  # instead of delivering it, with an inbox at http://localhost:8025.
+  # Production uses the client's own SMTP with the same SMTP_* variables.
+  mailpit:
+    image: axllent/mailpit:v1.31.0
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -69,6 +83,11 @@ services:
       INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-Administrador Eldo}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@eldo.com.br}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-Admin@123}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: ${SMTP_FROM:-Site Eldo <site@eldo.local>}
+      CONTACT_NOTIFICATION_EMAIL: ${CONTACT_NOTIFICATION_EMAIL:-contato@eldo.local}
+      MAILPIT_API_URL: http://mailpit:8025
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
@@ -77,6 +96,8 @@ services:
         condition: service_healthy
       seaweedfs-setup:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_healthy
 
 volumes:
   postgres_data:
