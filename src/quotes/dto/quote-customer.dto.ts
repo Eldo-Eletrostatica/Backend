@@ -1,17 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Matches,
-  MaxLength,
-} from 'class-validator';
+import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
 import { TrimString } from '../../common/trim-string';
 import {
   CUSTOMER_NAME_MAX_LENGTH,
   PHONE_MAX_LENGTH,
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
+import {
+  IsBrazilianPhone,
+  IsBusinessCustomerName,
+  IsCustomerEmail,
+} from '../../common/contact-fields';
 
 // 14 digits, without punctuation.
 const CNPJ_PATTERN = /^\d{14}$/;
@@ -26,6 +25,7 @@ export class QuoteCustomerDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(CUSTOMER_NAME_MAX_LENGTH)
+  @IsBusinessCustomerName()
   name: string;
 
   @ApiProperty({ example: '12345678000199', description: 'Só dígitos' })
@@ -33,14 +33,20 @@ export class QuoteCustomerDto {
   cnpj: string;
 
   @ApiProperty({ maxLength: EMAIL_MAX_LENGTH })
-  @IsEmail()
+  @IsCustomerEmail()
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 
-  @ApiProperty({ example: '61999999999', maxLength: PHONE_MAX_LENGTH })
+  @ApiProperty({
+    example: '61999999999',
+    description:
+      'Só dígitos, com DDD: 10 (fixo) ou 11 (celular, começando por 9)',
+    maxLength: PHONE_MAX_LENGTH,
+  })
   @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(PHONE_MAX_LENGTH)
+  @IsBrazilianPhone()
   phone: string;
 }

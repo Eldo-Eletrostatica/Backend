@@ -5,6 +5,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import {
+  INVALID_COMPANY_NAME_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+} from '../src/common/contact-fields';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { ESTIMATOR_DISABLED_MESSAGE } from '../src/quotes/quotes.service';
 
@@ -229,6 +233,50 @@ describe('Orçamento PJ (e2e) - US07', () => {
       });
 
       expect(res.status).toBe(400);
+    });
+
+    it.each([
+      ['telefone curto demais', { phone: '6199999' }, INVALID_PHONE_MESSAGE],
+      [
+        'telefone com máscara em vez de só dígitos',
+        { phone: '(61) 99999-9999' },
+        INVALID_PHONE_MESSAGE,
+      ],
+      [
+        'razão social de uma letra',
+        { name: 'A' },
+        INVALID_COMPANY_NAME_MESSAGE,
+      ],
+    ])(
+      'Critério 3: recusa o cliente com %s: %j',
+      async (_, overrides, message) => {
+        const res = await requestEstimate({
+          customer: { ...customer(), ...overrides },
+          items: [item()],
+          dueDate: DUE_DATE,
+        });
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          `customer.${message}`,
+        ]);
+      },
+    );
+
+    it.each([
+      [
+        'razão social com número e símbolos',
+        { name: 'Metal 3 S/A & Cia. Ltda' },
+      ],
+      ['telefone fixo de 10 dígitos', { phone: '6133334444' }],
+    ])('Critério 1: aceita o cliente com %s: %j', async (_, overrides) => {
+      const res = await requestEstimate({
+        customer: { ...customer(), ...overrides },
+        items: [item()],
+        dueDate: DUE_DATE,
+      });
+
+      expect(res.status).toBe(201);
     });
 
     it.each([
