@@ -5,6 +5,9 @@ import { CaptchaVerifier } from './captcha-verifier';
 // https://developers.cloudflare.com/turnstile/get-started/server-side-validation/
 export const TURNSTILE_VERIFY_URL =
   'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+// A Cloudflare that does not answer must not hold the form open: after this,
+// the token is refused like any other failure.
+const TURNSTILE_VERIFY_TIMEOUT_MS = 10_000;
 
 // Fails closed: without the secret key, or when Cloudflare cannot be reached,
 // no token passes, so a missing key in production blocks the forms instead
@@ -34,6 +37,7 @@ export class TurnstileCaptchaVerifier extends CaptchaVerifier {
           response: token,
           remoteip: clientIp,
         }),
+        signal: AbortSignal.timeout(TURNSTILE_VERIFY_TIMEOUT_MS),
       });
       const result = (await response.json()) as { success?: unknown };
       return result.success === true;

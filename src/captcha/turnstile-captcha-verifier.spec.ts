@@ -42,6 +42,7 @@ describe('TurnstileCaptchaVerifier', () => {
       const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
       expect(url).toBe(TURNSTILE_VERIFY_URL);
       expect(init.method).toBe('POST');
+      expect(init.signal).toBeInstanceOf(AbortSignal);
       expect(Object.fromEntries(init.body as URLSearchParams)).toEqual({
         secret: SECRET_KEY,
         response: 'token-do-site',
