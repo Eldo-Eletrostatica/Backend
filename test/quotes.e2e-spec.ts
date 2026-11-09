@@ -11,6 +11,11 @@ import {
 } from '../src/common/contact-fields';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { ESTIMATOR_DISABLED_MESSAGE } from '../src/quotes/quotes.service';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\n%%EOF');
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -44,7 +49,10 @@ describe('Orçamento PJ (e2e) - US07', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -147,6 +155,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send(body);
     const quote = res.body as QuoteResponseDto;
     if (res.status === 201) {
@@ -160,6 +169,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
     return request(app.getHttpServer())
       .post('/quotes/pdf')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .field('name', fields.name)
       .field('cnpj', fields.cnpj)
       .field('email', fields.email)

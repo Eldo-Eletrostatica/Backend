@@ -88,6 +88,9 @@ services:
       SMTP_FROM: ${SMTP_FROM:-Site Eldo <site@eldo.local>}
       NOTIFICATION_EMAIL: ${NOTIFICATION_EMAIL:-contato@eldo.local}
       MAILPIT_API_URL: http://mailpit:8025
+      # Cloudflare's test secret key: every token passes, so the CAPTCHA flow
+      # runs end to end in development. Production uses the client's own key.
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules

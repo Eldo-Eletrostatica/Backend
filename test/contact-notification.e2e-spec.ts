@@ -6,6 +6,11 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const MAILPIT_API_URL = process.env.MAILPIT_API_URL ?? 'http://localhost:8025';
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL ?? '';
@@ -69,7 +74,10 @@ describe('Aviso por e-mail de contato novo (e2e) - US28', () => {
     try {
       const moduleFixture = await Test.createTestingModule({
         imports: [AppModule],
-      }).compile();
+      })
+        .overrideProvider(CaptchaVerifier)
+        .useClass(FakeCaptchaVerifier)
+        .compile();
       const app = moduleFixture.createNestApplication<INestApplication<App>>();
       await app.init();
       return app;
@@ -87,6 +95,7 @@ describe('Aviso por e-mail de contato novo (e2e) - US28', () => {
   ) {
     const res = await request(app.getHttpServer())
       .post('/contact-requests')
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send({
         name: visitorName,
         email: 'visitante@email.com',

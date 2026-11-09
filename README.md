@@ -53,6 +53,7 @@ Variáveis disponíveis (`.env.example`):
 | `SMTP_USER`, `SMTP_PASSWORD` | Usuário e senha do SMTP. Vazios no Mailpit |
 | `SMTP_FROM` | Remetente dos e-mails, como `Site Eldo <site@dominio.com.br>` |
 | `NOTIFICATION_EMAIL` | Quem recebe os avisos de contato e de orçamento novos pelo site (US28). Vazio, nenhum aviso é enviado e os pedidos ficam só na área interna |
+| `TURNSTILE_SECRET_KEY` | Chave secreta do CAPTCHA (Cloudflare Turnstile) dos formulários públicos. O compose usa a chave de teste da Cloudflare, que aceita qualquer token. Sem ela, os formulários recusam todo envio (ver [Proteção contra spam](#proteção-contra-spam)) |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
@@ -185,9 +186,9 @@ O formulário de contato e o de orçamento são públicos, então um script pode
 
 - **Limite por IP:** 5 contatos e 10 orçamentos (somando simulador e PDF) por hora para cada IP. Acima disso, a API responde 429. O IP é o do visitante, vindo do `X-Forwarded-For` do proxy do Frontend, como no login. O limite roda antes da validação e do upload, então um script bloqueado nem envia o PDF.
 - **Honeypot no contato:** o site manda um campo `website` escondido, que pessoas não veem. Quando ele chega preenchido, a API responde como sucesso, mas não grava nem avisa. Fica fora do Swagger.
+- **CAPTCHA (Cloudflare Turnstile):** o contato e os dois orçamentos exigem o token do widget do site no header `X-Captcha-Token`. O Backend confere o token na Cloudflare com a `TURNSTILE_SECRET_KEY`; sem token, com token inválido, sem a chave ou com a Cloudflare fora do ar, responde 403 ("Confirme que você não é um robô e tente de novo."). A verificação roda depois do limite por IP, então um script sem CAPTCHA continua sendo contado e não consulta a Cloudflare em sequência. Em produção, o cliente cria um widget no painel da Cloudflare (o mesmo da conta do R2) e configura a chave secreta aqui e a chave do site no Frontend. Nos testes de integração, um verificador falso substitui a Cloudflare.
 - **Teto de avisos:** no máximo 20 e-mails de aviso por hora para a empresa, somando contatos e orçamentos. Acima disso, o pedido é gravado e aparece na área interna, mas sem e-mail. Vale mesmo contra um ataque espalhado por muitos IPs.
 
-Se isso não bastar em produção, o próximo passo é um CAPTCHA, como o Cloudflare Turnstile.
 
 ## Autenticação
 

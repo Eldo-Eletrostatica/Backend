@@ -14,6 +14,7 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
@@ -31,6 +32,7 @@ import {
   LimitPublicForm,
   MAX_QUOTE_REQUESTS_PER_HOUR,
 } from '../common/public-form-rate-limit';
+import { RequireCaptcha } from '../captcha/captcha.guard';
 
 // Public quote form for business customers (US07).
 @ApiTags('quotes')
@@ -50,6 +52,12 @@ export class QuotesController {
   }
 
   @Post('estimator')
+  @ApiHeader({
+    name: 'X-Captcha-Token',
+    required: true,
+    description: 'Token do Cloudflare Turnstile gerado no site',
+  })
+  @RequireCaptcha()
   @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Pede um orçamento pelo simulador',
@@ -72,6 +80,12 @@ export class QuotesController {
   }
 
   @Post('pdf')
+  @ApiHeader({
+    name: 'X-Captcha-Token',
+    required: true,
+    description: 'Token do Cloudflare Turnstile gerado no site',
+  })
+  @RequireCaptcha()
   @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Pede um orçamento enviando o projeto em PDF',
