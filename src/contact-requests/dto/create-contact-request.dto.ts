@@ -1,13 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiHideProperty, ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { TrimString } from '../../common/trim-string';
 import {
   CUSTOMER_NAME_MAX_LENGTH,
   PHONE_MAX_LENGTH,
 } from '../../customers/entities/customer.entity';
 import { EMAIL_MAX_LENGTH } from '../../database/columns';
+import {
+  IsBrazilianPhone,
+  IsCustomerEmail,
+  IsIndividualCustomerName,
+} from '../../common/contact-fields';
 
 export const CONTACT_MESSAGE_MAX_LENGTH = 2000;
+const HONEYPOT_MAX_LENGTH = 500;
 
 // Contact form of an individual customer (US06): no CPF, the team answers by
 // WhatsApp.
@@ -17,18 +23,25 @@ export class CreateContactRequestDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(CUSTOMER_NAME_MAX_LENGTH)
+  @IsIndividualCustomerName()
   name: string;
 
   @ApiProperty({ example: 'maria@email.com', maxLength: EMAIL_MAX_LENGTH })
-  @IsEmail()
+  @IsCustomerEmail()
   @MaxLength(EMAIL_MAX_LENGTH)
   email: string;
 
-  @ApiProperty({ example: '61999999999', maxLength: PHONE_MAX_LENGTH })
+  @ApiProperty({
+    example: '61999999999',
+    description:
+      'Só dígitos, com DDD: 10 (fixo) ou 11 (celular, começando por 9)',
+    maxLength: PHONE_MAX_LENGTH,
+  })
   @TrimString()
   @IsString()
   @IsNotEmpty()
   @MaxLength(PHONE_MAX_LENGTH)
+  @IsBrazilianPhone()
   phone: string;
 
   @ApiProperty({
@@ -40,4 +53,12 @@ export class CreateContactRequestDto {
   @IsNotEmpty()
   @MaxLength(CONTACT_MESSAGE_MAX_LENGTH)
   message: string;
+
+  // Honeypot: the site hides this field from people, so only a script fills
+  // it in. Left out of the API docs so it does not advertise itself.
+  @ApiHideProperty()
+  @IsOptional()
+  @IsString()
+  @MaxLength(HONEYPOT_MAX_LENGTH)
+  website?: string;
 }

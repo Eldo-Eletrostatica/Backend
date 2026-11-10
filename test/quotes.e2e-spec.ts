@@ -5,6 +5,10 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
+import {
+  INVALID_COMPANY_NAME_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+} from '../src/common/contact-fields';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { ESTIMATOR_DISABLED_MESSAGE } from '../src/quotes/quotes.service';
 
@@ -15,6 +19,13 @@ const DUE_DATE = '2030-01-15';
 interface EstimatorSettingsRow {
   is_estimator_enabled: boolean;
   negotiation_margin: string;
+}
+
+// Each form submission comes from a different visitor, as the Frontend proxy
+// reports it, so the per-IP form limit does not add up across tests.
+function randomClientIp(): string {
+  const octet = () => randomInt(1, 255);
+  return `10.${octet()}.${octet()}.${octet()}`;
 }
 
 describe('Orçamento PJ (e2e) - US07', () => {
@@ -135,6 +146,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
   async function requestEstimate(body: Record<string, unknown>) {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
+      .set('X-Forwarded-For', randomClientIp())
       .send(body);
     const quote = res.body as QuoteResponseDto;
     if (res.status === 201) {
@@ -147,6 +159,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
     const fields = customer();
     return request(app.getHttpServer())
       .post('/quotes/pdf')
+      .set('X-Forwarded-For', randomClientIp())
       .field('name', fields.name)
       .field('cnpj', fields.cnpj)
       .field('email', fields.email)
@@ -220,6 +233,50 @@ describe('Orçamento PJ (e2e) - US07', () => {
       });
 
       expect(res.status).toBe(400);
+    });
+
+    it.each([
+      ['telefone curto demais', { phone: '6199999' }, INVALID_PHONE_MESSAGE],
+      [
+        'telefone com máscara em vez de só dígitos',
+        { phone: '(61) 99999-9999' },
+        INVALID_PHONE_MESSAGE,
+      ],
+      [
+        'razão social de uma letra',
+        { name: 'A' },
+        INVALID_COMPANY_NAME_MESSAGE,
+      ],
+    ])(
+      'Critério 3: recusa o cliente com %s: %j',
+      async (_, overrides, message) => {
+        const res = await requestEstimate({
+          customer: { ...customer(), ...overrides },
+          items: [item()],
+          dueDate: DUE_DATE,
+        });
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          `customer.${message}`,
+        ]);
+      },
+    );
+
+    it.each([
+      [
+        'razão social com número e símbolos',
+        { name: 'Metal 3 S/A & Cia. Ltda' },
+      ],
+      ['telefone fixo de 10 dígitos', { phone: '6133334444' }],
+    ])('Critério 1: aceita o cliente com %s: %j', async (_, overrides) => {
+      const res = await requestEstimate({
+        customer: { ...customer(), ...overrides },
+        items: [item()],
+        dueDate: DUE_DATE,
+      });
+
+      expect(res.status).toBe(201);
     });
 
     it.each([

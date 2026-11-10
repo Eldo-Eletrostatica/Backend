@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { FixedWindowCounter } from '../common/fixed-window-counter';
 import { normalizeEmail } from '../common/normalize-email';
 
 export const MAX_LOGIN_ATTEMPTS_PER_ACCOUNT = 5;
@@ -11,11 +12,6 @@ export const MAX_LOGIN_ATTEMPTS_PER_IP = 20;
 export const LOGIN_ATTEMPTS_WINDOW_MS = 60_000;
 export const TOO_MANY_LOGIN_ATTEMPTS_MESSAGE =
   'Muitas tentativas de login. Tente novamente em 1 minuto.';
-
-interface FailureCount {
-  failures: number;
-  windowEndsAt: number;
-}
 
 // Limits failed logins, not logins: a correct password neither counts nor
 // keeps counting the earlier mistakes. Two limits, per account and IP against
@@ -25,8 +21,7 @@ interface FailureCount {
 // reset when the API restarts.
 @Injectable()
 export class LoginAttemptsService {
-  private readonly failureCounts = new Map<string, FailureCount>();
-  private nextCleanupAt = 0;
+  private readonly failures = new FixedWindowCounter(LOGIN_ATTEMPTS_WINDOW_MS);
 
   async track<T>(
     clientIp: string,
@@ -38,8 +33,8 @@ export class LoginAttemptsService {
     const now = Date.now();
 
     if (
-      this.countFailures(accountKey, now) >= MAX_LOGIN_ATTEMPTS_PER_ACCOUNT ||
-      this.countFailures(ipKey, now) >= MAX_LOGIN_ATTEMPTS_PER_IP
+      this.failures.count(accountKey, now) >= MAX_LOGIN_ATTEMPTS_PER_ACCOUNT ||
+      this.failures.count(ipKey, now) >= MAX_LOGIN_ATTEMPTS_PER_IP
     ) {
       throw new HttpException(
         TOO_MANY_LOGIN_ATTEMPTS_MESSAGE,
@@ -49,45 +44,14 @@ export class LoginAttemptsService {
 
     try {
       const result = await login();
-      this.failureCounts.delete(accountKey);
+      this.failures.reset(accountKey);
       return result;
     } catch (error) {
       if (error instanceof UnauthorizedException) {
-        this.recordFailure(accountKey, now);
-        this.recordFailure(ipKey, now);
+        this.failures.increment(accountKey, now);
+        this.failures.increment(ipKey, now);
       }
       throw error;
     }
-  }
-
-  private countFailures(key: string, now: number): number {
-    const count = this.failureCounts.get(key);
-    return count && count.windowEndsAt > now ? count.failures : 0;
-  }
-
-  private recordFailure(key: string, now: number): void {
-    this.removeExpiredCounts(now);
-    const count = this.failureCounts.get(key);
-    if (count && count.windowEndsAt > now) {
-      count.failures += 1;
-    } else {
-      this.failureCounts.set(key, {
-        failures: 1,
-        windowEndsAt: now + LOGIN_ATTEMPTS_WINDOW_MS,
-      });
-    }
-  }
-
-  // Keeps the map from growing with every email an attacker tries.
-  private removeExpiredCounts(now: number): void {
-    if (now < this.nextCleanupAt) {
-      return;
-    }
-    for (const [key, count] of this.failureCounts) {
-      if (count.windowEndsAt <= now) {
-        this.failureCounts.delete(key);
-      }
-    }
-    this.nextCleanupAt = now + LOGIN_ATTEMPTS_WINDOW_MS;
   }
 }

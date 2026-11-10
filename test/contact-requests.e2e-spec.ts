@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -8,9 +8,21 @@ import { AppModule } from '../src/app.module';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { hashPassword } from '../src/auth/password-hash';
 import { ContactRequestResponseDto } from '../src/contact-requests/dto/contact-request-response.dto';
+import {
+  INVALID_EMAIL_MESSAGE,
+  INVALID_PERSON_NAME_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+} from '../src/common/contact-fields';
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
 
 const PASSWORD = 'Password@123';
+
+// Each form submission comes from a different visitor, as the Frontend proxy
+// reports it, so the per-IP form limit does not add up across tests.
+function randomClientIp(): string {
+  const octet = () => randomInt(1, 255);
+  return `10.${octet()}.${octet()}.${octet()}`;
+}
 
 describe('Formulário de contato PF (e2e) - US06', () => {
   let app: INestApplication<App>;
@@ -81,6 +93,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
   async function sendContactForm(body: Record<string, unknown>) {
     const res = await request(app.getHttpServer())
       .post('/contact-requests')
+      .set('X-Forwarded-For', randomClientIp())
       .send(body);
     if (res.status === 201) {
       created.orderIds.push((res.body as ContactRequestResponseDto).orderId);
@@ -139,6 +152,54 @@ describe('Formulário de contato PF (e2e) - US06', () => {
     );
 
     it.each([
+      ['curto demais', '6199999'],
+      ['com DDD começando por 0', '01999999999'],
+      ['celular de 11 dígitos sem o 9', '61899999999'],
+      ['celular incompleto de 10 dígitos começando por 9', '6199998888'],
+      ['com letras', '6199999abcd'],
+      ['com máscara em vez de só dígitos', '(61) 99999-9999'],
+    ])(
+      'Critério 2: recusa um telefone %s (%s) com a mensagem do formato',
+      async (_, phone) => {
+        const res = await sendContactForm(contactForm({ phone }));
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          INVALID_PHONE_MESSAGE,
+        ]);
+      },
+    );
+
+    it.each([
+      ['com número', 'Maria 2'],
+      ['com símbolo', 'Maria@Souza'],
+      ['com uma letra só', 'M'],
+      ['terminando em hífen', 'Maria-'],
+    ])(
+      'Critério 2: recusa um nome %s (%s) com a mensagem do formato',
+      async (_, name) => {
+        const res = await sendContactForm(contactForm({ name }));
+
+        expect(res.status).toBe(400);
+        expect((res.body as { message: string[] }).message).toEqual([
+          INVALID_PERSON_NAME_MESSAGE,
+        ]);
+      },
+    );
+
+    it.each([
+      ['telefone fixo de 10 dígitos', { phone: '6133334444' }],
+      ['celular de 11 dígitos', { phone: '61999998888' }],
+      ['nome com acento e apóstrofo', { name: "Joana D'Ávila" }],
+      ['nome com apóstrofo tipográfico', { name: 'Joana D’Ávila' }],
+      ['nome composto com hífen', { name: 'Ana-Clara Souza' }],
+    ])('Critério 1: aceita %s: %j', async (_, overrides) => {
+      const res = await sendContactForm(contactForm(overrides));
+
+      expect(res.status).toBe(201);
+    });
+
+    it.each([
       ['sem arroba', 'maria.email.com'],
       ['sem domínio', 'maria@'],
     ])(
@@ -148,7 +209,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
 
         expect(res.status).toBe(400);
         expect((res.body as { message: string[] }).message).toEqual([
-          'email must be an email',
+          INVALID_EMAIL_MESSAGE,
         ]);
       },
     );
