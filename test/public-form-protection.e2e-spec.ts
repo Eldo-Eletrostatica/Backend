@@ -12,6 +12,11 @@ import {
   MAX_QUOTE_REQUESTS_PER_HOUR,
   TOO_MANY_FORM_SUBMISSIONS_MESSAGE,
 } from '../src/common/public-form-rate-limit';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const MAILPIT_API_URL = process.env.MAILPIT_API_URL ?? 'http://localhost:8025';
 const EMAIL_WAIT_MS = 5000;
@@ -44,7 +49,10 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
     // A new app per test starts the in-memory counters from zero.
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -73,6 +81,7 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
     const res = await request(app.getHttpServer())
       .post('/contact-requests')
       .set('X-Forwarded-For', clientIp)
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send({
         name: `Visitante ${randomLetters(8)}`,
         email: 'visitante@email.com',
@@ -140,6 +149,7 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
         await request(app.getHttpServer())
           .post(quotePath)
           .set('X-Forwarded-For', clientIp)
+          .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
           .send({})
           .expect(400);
       }
@@ -147,6 +157,7 @@ describe('Proteção dos formulários públicos contra spam (e2e) - US06, US07 e
       const res = await request(app.getHttpServer())
         .post(path)
         .set('X-Forwarded-For', clientIp)
+        .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
         .send({});
 
       expect(res.status).toBe(429);

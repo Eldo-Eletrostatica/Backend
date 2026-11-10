@@ -14,6 +14,11 @@ import {
   INVALID_PHONE_MESSAGE,
 } from '../src/common/contact-fields';
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const PASSWORD = 'Password@123';
 
@@ -35,7 +40,10 @@ describe('Formulário de contato PF (e2e) - US06', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -94,6 +102,7 @@ describe('Formulário de contato PF (e2e) - US06', () => {
     const res = await request(app.getHttpServer())
       .post('/contact-requests')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send(body);
     if (res.status === 201) {
       created.orderIds.push((res.body as ContactRequestResponseDto).orderId);

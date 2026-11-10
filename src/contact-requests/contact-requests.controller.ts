@@ -14,6 +14,7 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -31,6 +32,7 @@ import {
   LimitPublicForm,
   MAX_CONTACT_REQUESTS_PER_HOUR,
 } from '../common/public-form-rate-limit';
+import { RequireCaptcha } from '../captcha/captcha.guard';
 
 // Contact form of individual customers (US06). Sending is public; listing and
 // marking as handled are for any employee of the team.
@@ -42,6 +44,12 @@ export class ContactRequestsController {
   ) {}
 
   @Post()
+  @ApiHeader({
+    name: 'X-Captcha-Token',
+    required: true,
+    description: 'Token do Cloudflare Turnstile gerado no site',
+  })
+  @RequireCaptcha()
   @LimitPublicForm('contact-request', MAX_CONTACT_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Envia o formulário de contato',

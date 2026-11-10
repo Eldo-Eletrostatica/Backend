@@ -17,6 +17,9 @@ import { FixedWindowCounter } from './fixed-window-counter';
 // is a script flooding the database (and, for contacts, the company's inbox).
 export const MAX_CONTACT_REQUESTS_PER_HOUR = 5;
 export const MAX_QUOTE_REQUESTS_PER_HOUR = 10;
+// Calculating the price range saves nothing and sends no email, and a visitor
+// may try many combinations of parts, so the limit is looser.
+export const MAX_PRICE_RANGE_REQUESTS_PER_HOUR = 60;
 export const TOO_MANY_FORM_SUBMISSIONS_MESSAGE =
   'Muitos envios em pouco tempo. Tente novamente mais tarde.';
 

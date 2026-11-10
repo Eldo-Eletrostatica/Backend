@@ -11,6 +11,11 @@ import {
 } from '../src/common/contact-fields';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { ESTIMATOR_DISABLED_MESSAGE } from '../src/quotes/quotes.service';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\n%%EOF');
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -44,7 +49,10 @@ describe('Orçamento PJ (e2e) - US07', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -147,6 +155,7 @@ describe('Orçamento PJ (e2e) - US07', () => {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send(body);
     const quote = res.body as QuoteResponseDto;
     if (res.status === 201) {
@@ -160,12 +169,82 @@ describe('Orçamento PJ (e2e) - US07', () => {
     return request(app.getHttpServer())
       .post('/quotes/pdf')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .field('name', fields.name)
       .field('cnpj', fields.cnpj)
       .field('email', fields.email)
       .field('phone', fields.phone)
       .attach('file', content, { filename, contentType });
   }
+
+  // Only shows the range: the quote is created later, if the customer asks
+  // for a formal one, through POST /quotes/estimator.
+  function calculatePriceRange(body: Record<string, unknown>) {
+    return request(app.getHttpServer())
+      .post('/quotes/estimator/price-range')
+      .set('X-Forwarded-For', randomClientIp())
+      .send(body);
+  }
+
+  async function countOrderItemsWithPaint(paintCatalogItemId: string) {
+    const [{ count }] = await dataSource.query<{ count: string }[]>(
+      'SELECT count(*) FROM order_items WHERE paint_catalog_item_id = $1',
+      [paintCatalogItemId],
+    );
+    return Number(count);
+  }
+
+  describe('Faixa de preço sem pedido (US07)', () => {
+    it.each([
+      // 2 m² × 3 × R$ 50 × 1,0 = R$ 300; + 15% = R$ 345.
+      ['uma peça', [{}], { minPrice: 300, maxPrice: 345 }],
+      // (2 m² × 3 + 2 m² × 1) × R$ 50 × 1,0 = R$ 400; + 15% = R$ 460.
+      ['duas peças', [{}, { quantity: 1 }], { minPrice: 400, maxPrice: 460 }],
+    ])(
+      'calcula a faixa de %s sem CAPTCHA e sem dados da empresa: %j',
+      async (_, itemOverrides, expected) => {
+        const res = await calculatePriceRange({
+          items: itemOverrides.map((overrides) => item(overrides)),
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(expected);
+      },
+    );
+
+    it('não grava pedido nem cliente', async () => {
+      await calculatePriceRange({ items: [item()] }).expect(200);
+
+      expect(await countOrderItemsWithPaint(epoxyId)).toBe(0);
+    });
+
+    it.each<[string, Record<string, unknown>[], number]>([
+      ['sem itens', [], 400],
+      ['com área zero', [{ areaM2: 0 }], 400],
+      [
+        'com tipo de pintura inexistente',
+        [{ paintCatalogItemId: randomUUID() }],
+        422,
+      ],
+    ])('recusa o cálculo %s: %j', async (_, itemOverrides, expectedStatus) => {
+      const res = await calculatePriceRange({
+        items: itemOverrides.map((overrides) => item(overrides)),
+      });
+
+      expect(res.status).toBe(expectedStatus);
+    });
+
+    it('com o simulador desligado, recusa o cálculo', async () => {
+      await setEstimator(false, 15);
+
+      const res = await calculatePriceRange({ items: [item()] });
+
+      expect(res.status).toBe(403);
+      expect((res.body as { message: string }).message).toBe(
+        ESTIMATOR_DISABLED_MESSAGE,
+      );
+    });
+  });
 
   describe('Critérios de Aceite da US07', () => {
     it('Critério 1: devolve a faixa do preço calculado até o preço com a margem', async () => {

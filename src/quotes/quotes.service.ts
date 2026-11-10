@@ -19,12 +19,13 @@ import {
 } from '../orders/entities/order.entity';
 import { SiteSettingsService } from '../site-settings/site-settings.service';
 import { StorageService } from '../storage/storage.service';
+import { CalculatePriceRangeDto } from './dto/calculate-price-range.dto';
 import { CreateEstimatedQuoteDto } from './dto/create-estimated-quote.dto';
 import { CreatePdfQuoteDto } from './dto/create-pdf-quote.dto';
 import { EstimatorOptionsDto } from './dto/estimator-options.dto';
 import { QuoteCustomerDto } from './dto/quote-customer.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
-import { calculatePriceRange } from './price-range';
+import { calculatePriceRange, PriceRange } from './price-range';
 import {
   isPdf,
   QUOTE_PDFS_FOLDER,
@@ -74,16 +75,24 @@ export class QuotesService {
     };
   }
 
-  // The range is calculated with the catalog prices and the margin of now, and
-  // both the range and the prices are stored with the quote (ADR 0003).
+  // Only shows the range to the visitor: nothing is saved and no one is
+  // notified. The quote is created if the customer then asks for a formal one.
+  async getPriceRange(dto: CalculatePriceRangeDto): Promise<PriceRange> {
+    const negotiationMargin = await this.getEnabledNegotiationMargin();
+    const orderItems = await buildOrderItems(
+      this.dataSource.manager,
+      dto.items,
+    );
+    return calculatePriceRange(orderItems, negotiationMargin);
+  }
+
+  // The formal request of a quote through the estimator. The range is
+  // calculated again with the catalog prices and the margin of now, and both
+  // the range and the prices are stored with the quote (ADR 0003).
   async createEstimatedQuote(
     dto: CreateEstimatedQuoteDto,
   ): Promise<QuoteResponseDto> {
-    const { isEnabled, negotiationMargin } =
-      await this.siteSettingsService.getEstimatorSettings();
-    if (!isEnabled) {
-      throw new ForbiddenException(ESTIMATOR_DISABLED_MESSAGE);
-    }
+    const negotiationMargin = await this.getEnabledNegotiationMargin();
 
     const quote = await this.dataSource.transaction(async (manager) => {
       const orderItems = await buildOrderItems(manager, dto.items);
@@ -106,7 +115,7 @@ export class QuotesService {
       await manager.save(orderItems);
       return toResponse(order);
     });
-    // Not awaited: the client gets the estimate without waiting for the SMTP
+    // Not awaited: the client gets the answer without waiting for the SMTP
     // server, and the notifier handles its own failures.
     void this.quoteNotifier.notifyEstimatedQuote(dto, quote);
     return quote;
@@ -140,6 +149,15 @@ export class QuotesService {
     });
     void this.quoteNotifier.notifyPdfQuote(dto, quote, content);
     return quote;
+  }
+
+  private async getEnabledNegotiationMargin(): Promise<number> {
+    const { isEnabled, negotiationMargin } =
+      await this.siteSettingsService.getEstimatorSettings();
+    if (!isEnabled) {
+      throw new ForbiddenException(ESTIMATOR_DISABLED_MESSAGE);
+    }
+    return negotiationMargin;
   }
 
   private async saveQuote(

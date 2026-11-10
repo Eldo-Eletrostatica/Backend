@@ -8,6 +8,7 @@ import { QuotesController } from './quotes.controller';
 import { QuotesService } from './quotes.service';
 import { MailModule } from '../mail/mail.module';
 import { QuoteNotifier } from './quote-notifier';
+import { CaptchaModule } from '../captcha/captcha.module';
 
 // A quote is a stage of the order (ADR 0005): this module writes orders,
 // order items and customers, and reads the catalog and the estimator settings.
@@ -19,6 +20,7 @@ import { QuoteNotifier } from './quote-notifier';
     SiteSettingsModule,
     StorageModule,
     MailModule,
+    CaptchaModule,
   ],
   controllers: [QuotesController],
   providers: [QuotesService, QuoteNotifier],

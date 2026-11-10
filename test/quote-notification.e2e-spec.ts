@@ -6,6 +6,11 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const MAILPIT_API_URL = process.env.MAILPIT_API_URL ?? 'http://localhost:8025';
 const NOTIFICATION_EMAIL = process.env.NOTIFICATION_EMAIL ?? '';
@@ -81,7 +86,10 @@ describe('Aviso por e-mail de orçamento novo (e2e) - US07 e US28', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -134,6 +142,7 @@ describe('Aviso por e-mail de orçamento novo (e2e) - US07 e US28', () => {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send({
         customer: {
           name: companyName,
@@ -183,6 +192,7 @@ describe('Aviso por e-mail de orçamento novo (e2e) - US07 e US28', () => {
     const res = await request(app.getHttpServer())
       .post('/quotes/pdf')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .field('name', companyName)
       .field('cnpj', cnpj)
       .field('email', 'compras@empresa.com.br')

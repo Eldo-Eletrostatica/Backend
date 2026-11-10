@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   ParseFilePipe,
   Post,
   UploadedFile,
@@ -14,6 +16,7 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
@@ -21,16 +24,20 @@ import {
   ApiUnprocessableEntityResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { CalculatePriceRangeDto } from './dto/calculate-price-range.dto';
 import { CreateEstimatedQuoteDto } from './dto/create-estimated-quote.dto';
 import { CreatePdfQuoteDto } from './dto/create-pdf-quote.dto';
 import { EstimatorOptionsDto } from './dto/estimator-options.dto';
+import { PriceRangeDto } from './dto/price-range.dto';
 import { QuoteResponseDto } from './dto/quote-response.dto';
 import { MAX_QUOTE_PDF_BYTES } from './quote-pdf';
 import { QuotesService } from './quotes.service';
 import {
   LimitPublicForm,
+  MAX_PRICE_RANGE_REQUESTS_PER_HOUR,
   MAX_QUOTE_REQUESTS_PER_HOUR,
 } from '../common/public-form-rate-limit';
+import { RequireCaptcha } from '../captcha/captcha.guard';
 
 // Public quote form for business customers (US07).
 @ApiTags('quotes')
@@ -49,19 +56,49 @@ export class QuotesController {
     return this.quotesService.getEstimatorOptions();
   }
 
+  @Post('estimator/price-range')
+  @HttpCode(HttpStatus.OK)
+  @LimitPublicForm('priceRange', MAX_PRICE_RANGE_REQUESTS_PER_HOUR)
+  @ApiOperation({
+    summary: 'Calcula a faixa de preço do simulador',
+    description:
+      'Só mostra a faixa ao visitante: não grava o pedido, não cadastra o cliente e não avisa a Eldo. Para isso, o cliente pede o orçamento formal em POST /quotes/estimator.',
+  })
+  @ApiOkResponse({ type: PriceRangeDto })
+  @ApiBadRequestResponse({
+    description: 'Sem itens, área ou quantidade zero ou negativa',
+  })
+  @ApiForbiddenResponse({ description: 'Simulador desativado' })
+  @ApiUnprocessableEntityResponse({
+    description: 'Tipo de pintura ou material inexistente ou desativado',
+  })
+  calculatePriceRange(
+    @Body() dto: CalculatePriceRangeDto,
+  ): Promise<PriceRangeDto> {
+    return this.quotesService.getPriceRange(dto);
+  }
+
   @Post('estimator')
+  @ApiHeader({
+    name: 'X-Captcha-Token',
+    required: true,
+    description: 'Token do Cloudflare Turnstile gerado no site',
+  })
+  @RequireCaptcha()
   @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
-    summary: 'Pede um orçamento pelo simulador',
+    summary: 'Pede o orçamento formal pelo simulador',
     description:
-      'Calcula a faixa de preço com o catálogo e a margem atuais, cadastra o cliente pelo CNPJ (ou usa o existente) e guarda o orçamento. A faixa é uma estimativa inicial, sujeita à confirmação da Eldo.',
+      'Depois de ver a faixa, o cliente pede o orçamento: a API calcula a faixa de novo com o catálogo e a margem atuais, cadastra o cliente pelo CNPJ (ou usa o existente), guarda o orçamento e avisa a Eldo por e-mail. A faixa é uma estimativa inicial, sujeita à confirmação da Eldo.',
   })
   @ApiCreatedResponse({ type: QuoteResponseDto })
   @ApiBadRequestResponse({
     description:
       'Campo obrigatório em branco, área ou quantidade zero ou negativa',
   })
-  @ApiForbiddenResponse({ description: 'Simulador desativado' })
+  @ApiForbiddenResponse({
+    description: 'Simulador desativado ou CAPTCHA ausente ou recusado',
+  })
   @ApiUnprocessableEntityResponse({
     description: 'Tipo de pintura ou material inexistente ou desativado',
   })
@@ -72,6 +109,12 @@ export class QuotesController {
   }
 
   @Post('pdf')
+  @ApiHeader({
+    name: 'X-Captcha-Token',
+    required: true,
+    description: 'Token do Cloudflare Turnstile gerado no site',
+  })
+  @RequireCaptcha()
   @LimitPublicForm('quote', MAX_QUOTE_REQUESTS_PER_HOUR)
   @ApiOperation({
     summary: 'Pede um orçamento enviando o projeto em PDF',

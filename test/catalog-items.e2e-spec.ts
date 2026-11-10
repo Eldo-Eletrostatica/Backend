@@ -11,6 +11,11 @@ import { CatalogItemResponseDto } from '../src/catalog-items/dto/catalog-item-re
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { EstimatorSettingsDto } from '../src/site-settings/dto/estimator-settings.dto';
+import { CaptchaVerifier } from '../src/captcha/captcha-verifier';
+import {
+  FakeCaptchaVerifier,
+  VALID_CAPTCHA_TOKEN,
+} from './support/fake-captcha';
 
 const PASSWORD = 'Password@123';
 
@@ -42,7 +47,10 @@ describe('Regras de cálculo de orçamento (e2e) - US08', () => {
   beforeAll(async () => {
     const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
     app = moduleFixture.createNestApplication();
     await app.init();
     dataSource = app.get(DataSource);
@@ -143,6 +151,7 @@ describe('Regras de cálculo de orçamento (e2e) - US08', () => {
     const res = await request(app.getHttpServer())
       .post('/quotes/estimator')
       .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', VALID_CAPTCHA_TOKEN)
       .send({
         customer: {
           name: 'Cliente Teste',
