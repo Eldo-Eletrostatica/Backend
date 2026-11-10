@@ -29,6 +29,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { EmployeeResponseDto } from './dto/employee-response.dto';
+import { EmployeeSellerResponseDto } from './dto/employee-seller-response.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { EmployeeRole } from './entities/employee.entity';
 import { EmployeesService } from './employees.service';
@@ -73,6 +74,23 @@ export class EmployeesController {
   @ApiForbiddenResponse({ description: 'Acesso restrito a administradores' })
   findAll(): Promise<EmployeeResponseDto[]> {
     return this.employeesService.findAll();
+  }
+
+  // Declared before `:employeeId` so the UUID pipe does not capture "sellers".
+  @Get('sellers')
+  @Roles(EmployeeRole.Admin, EmployeeRole.Manager, EmployeeRole.Employee)
+  @ApiOperation({
+    summary: 'Lista os vendedores disponíveis para o lançamento de venda',
+    description:
+      'Retorna os funcionários ativos com apenas identificador e nome, para preencher o seletor de vendedor no lançamento de venda. Acessível a qualquer funcionário autenticado.',
+  })
+  @ApiOkResponse({
+    description: 'Lista de vendedores ativos',
+    type: [EmployeeSellerResponseDto],
+  })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  findAllSellers(): Promise<EmployeeSellerResponseDto[]> {
+    return this.employeesService.findAllSellers();
   }
 
   @Get(':employeeId')

@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { findPriceProblem } from './catalog-item-price';
+import { CatalogItemOptionResponseDto } from './dto/catalog-item-option-response.dto';
 import { CatalogItemResponseDto } from './dto/catalog-item-response.dto';
 import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 import { ListCatalogItemsQueryDto } from './dto/list-catalog-items-query.dto';
@@ -31,6 +32,16 @@ export class CatalogItemsService {
       order: { type: 'ASC', name: 'ASC' },
     });
     return catalogItems.map(toResponse);
+  }
+
+  // Used by the sales screen even when the public estimator is disabled, so it
+  // selects only the option fields and never exposes prices.
+  async findOptions(): Promise<CatalogItemOptionResponseDto[]> {
+    return this.catalogItemRepository.find({
+      select: { catalogItemId: true, type: true, name: true },
+      where: { isActive: true },
+      order: { type: 'ASC', name: 'ASC' },
+    });
   }
 
   async create(dto: CreateCatalogItemDto): Promise<CatalogItemResponseDto> {

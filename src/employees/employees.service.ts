@@ -8,6 +8,7 @@ import { Not, Repository } from 'typeorm';
 import { hashPassword } from '../auth/password-hash';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { EmployeeResponseDto } from './dto/employee-response.dto';
+import { EmployeeSellerResponseDto } from './dto/employee-seller-response.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { Employee, EmployeeRole } from './entities/employee.entity';
 
@@ -44,6 +45,15 @@ export class EmployeesService {
       order: { name: 'ASC' },
     });
     return employees.map((employee) => this.toResponseDto(employee));
+  }
+
+  // Only the seller selector fields are selected so the admin-only employee
+  // data (e-mail, role, commission) never reaches non-admin callers.
+  async findAllSellers(): Promise<EmployeeSellerResponseDto[]> {
+    return this.employeeRepository.find({
+      select: { employeeId: true, name: true },
+      order: { name: 'ASC' },
+    });
   }
 
   async findOne(employeeId: string): Promise<EmployeeResponseDto> {
