@@ -9,6 +9,7 @@ import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { FORBIDDEN_ROLE_MESSAGE } from '../src/auth/guards/roles.guard';
 import { hashPassword } from '../src/auth/password-hash';
 import { EmployeeResponseDto } from '../src/employees/dto/employee-response.dto';
+import { EmployeeSellerResponseDto } from '../src/employees/dto/employee-seller-response.dto';
 import {
   EMAIL_IN_USE_MESSAGE,
   LAST_ADMIN_MESSAGE,
@@ -198,6 +199,69 @@ describe('Cadastro e Permissões de Funcionários (e2e) - US10', () => {
       )
       .map((emp) => emp.name);
     expect(seededNames).toEqual(['Amanda Costa', 'Zelda Ferreira']);
+  });
+
+  it.each([EmployeeRole.Admin, EmployeeRole.Manager, EmployeeRole.Employee])(
+    'Critério 5: funcionário autenticado com nível %s consulta o seletor de vendedores',
+    async (callerRole) => {
+      const { token } = await loginAs(callerRole);
+      const beta = await seedEmployee(
+        EmployeeRole.Employee,
+        'SenhaValida@123',
+        'Vendedor Beta',
+      );
+      const alfa = await seedEmployee(
+        EmployeeRole.Employee,
+        'SenhaValida@123',
+        'Vendedor Alfa',
+      );
+
+      // Resolved before `:employeeId`, so the UUID pipe does not reject it.
+      const res = await request(app.getHttpServer())
+        .get('/employees/sellers')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const sellers = res.body as EmployeeSellerResponseDto[];
+      const seeded = sellers.filter((seller) =>
+        [alfa.employeeId, beta.employeeId].includes(seller.employeeId),
+      );
+      expect(seeded.map((seller) => seller.name)).toEqual([
+        'Vendedor Alfa',
+        'Vendedor Beta',
+      ]);
+      seeded.forEach((seller) => {
+        expect(Object.keys(seller).sort()).toEqual(['employeeId', 'name']);
+      });
+    },
+  );
+
+  it('Critério 5: omite vendedores removidos logicamente da consulta de vendedores', async () => {
+    const { token: adminToken } = await loginAs(EmployeeRole.Admin);
+    const removedSeller = await seedEmployee(
+      EmployeeRole.Employee,
+      'SenhaValida@123',
+      'Vendedor Removido',
+    );
+
+    await request(app.getHttpServer())
+      .delete(`/employees/${removedSeller.employeeId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+
+    const res = await request(app.getHttpServer())
+      .get('/employees/sellers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+
+    const sellers = res.body as EmployeeSellerResponseDto[];
+    expect(
+      sellers.some((seller) => seller.employeeId === removedSeller.employeeId),
+    ).toBe(false);
+  });
+
+  it('Critério 5: nega com 401 a consulta de vendedores sem autenticação', async () => {
+    await request(app.getHttpServer()).get('/employees/sellers').expect(401);
   });
 
   it.each([
