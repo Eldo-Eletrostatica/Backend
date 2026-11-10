@@ -31,6 +31,7 @@ import {
   toStoredPdf,
   UNSUPPORTED_QUOTE_FILE_MESSAGE,
 } from './quote-pdf';
+import { QuoteNotifier } from './quote-notifier';
 
 export const ESTIMATOR_DISABLED_MESSAGE =
   'O simulador de orçamento está desativado. Envie o projeto em PDF.';
@@ -48,6 +49,7 @@ export class QuotesService {
     private readonly catalogItemRepository: Repository<CatalogItem>,
     private readonly siteSettingsService: SiteSettingsService,
     private readonly storageService: StorageService,
+    private readonly quoteNotifier: QuoteNotifier,
   ) {}
 
   async getEstimatorOptions(): Promise<EstimatorOptionsDto> {
@@ -83,7 +85,7 @@ export class QuotesService {
       throw new ForbiddenException(ESTIMATOR_DISABLED_MESSAGE);
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const quote = await this.dataSource.transaction(async (manager) => {
       const orderItems = await buildOrderItems(manager, dto.items);
       const { minPrice, maxPrice } = calculatePriceRange(
         orderItems,
@@ -104,6 +106,10 @@ export class QuotesService {
       await manager.save(orderItems);
       return toResponse(order);
     });
+    // Not awaited: the client gets the estimate without waiting for the SMTP
+    // server, and the notifier handles its own failures.
+    void this.quoteNotifier.notifyEstimatedQuote(dto, quote);
+    return quote;
   }
 
   // The PDF stays available even with the estimator turned off (US08). The file
@@ -121,7 +127,7 @@ export class QuotesService {
       QUOTE_PDFS_FOLDER,
     );
 
-    return this.dataSource.transaction(async (manager) => {
+    const quote = await this.dataSource.transaction(async (manager) => {
       const order = await this.saveQuote(manager, dto, {
         source: OrderSource.Pdf,
         customerMessage: dto.message ?? null,
@@ -132,6 +138,8 @@ export class QuotesService {
       });
       return toResponse(order);
     });
+    void this.quoteNotifier.notifyPdfQuote(dto, quote, content);
+    return quote;
   }
 
   private async saveQuote(

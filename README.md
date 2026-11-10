@@ -52,7 +52,7 @@ Variáveis disponíveis (`.env.example`):
 | `SMTP_HOST`, `SMTP_PORT` | Servidor de e-mail (SMTP). No Docker Compose, o Mailpit (`mailpit:1025`); em produção, o SMTP do e-mail do cliente. Sem `SMTP_HOST`, nenhum e-mail é enviado |
 | `SMTP_USER`, `SMTP_PASSWORD` | Usuário e senha do SMTP. Vazios no Mailpit |
 | `SMTP_FROM` | Remetente dos e-mails, como `Site Eldo <site@dominio.com.br>` |
-| `CONTACT_NOTIFICATION_EMAIL` | Quem recebe o aviso de contato novo pelo site (US28). Vazio, o aviso não é enviado e o contato fica só na área interna |
+| `NOTIFICATION_EMAIL` | Quem recebe os avisos de contato e de orçamento novos pelo site (US28). Vazio, nenhum aviso é enviado e os pedidos ficam só na área interna |
 
 > No `docker-compose.yml`, essas variáveis já vêm sobrescritas com os valores corretos para o container (`DB_HOST=postgres`, `S3_ENDPOINT=http://seaweedfs:8333`), então o `.env` local só é realmente necessário se você rodar sem Docker.
 
@@ -163,13 +163,21 @@ Para ligar o Google de verdade:
 5. Pegue o Place ID da Eldo no [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id). Ele começa com `ChIJ`.
 6. No servidor, configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID` e `USE_SAMPLE_REVIEWS=false`.
 
-## E-mail de aviso de contato
+## Avisos por e-mail
 
-Quando um visitante envia o formulário de contato (US06), o Backend registra o contato e manda um aviso para `CONTACT_NOTIFICATION_EMAIL` (US28), com o nome, o telefone, o e-mail e a mensagem. O `Reply-To` é o e-mail do visitante, então quem recebe o aviso responde direto. O envio acontece depois da resposta ao visitante: se o SMTP falhar, o contato continua registrado e a falha só aparece no log.
+Cada pedido novo pelo site gera um aviso para `NOTIFICATION_EMAIL` (US28):
+
+| Pedido | Assunto | Conteúdo |
+| --- | --- | --- |
+| Contato PF (US06) | `Novo contato pelo site: <nome>` | Nome, telefone, e-mail e mensagem |
+| Orçamento pelo simulador (US07) | `Novo orçamento pelo simulador: <empresa>` | Empresa, CNPJ, telefone, e-mail, prazo, peças (com os nomes do catálogo), faixa de preço e observações |
+| Orçamento por PDF (US07) | `Novo orçamento por PDF: <empresa>` | Os dados da empresa, o prazo e as observações, com o PDF anexado (`projeto-<CNPJ>.pdf`) |
+
+O `Reply-To` é o e-mail de quem fez o pedido, então quem recebe o aviso responde direto. O envio acontece depois da resposta ao visitante: se o SMTP falhar, o pedido continua registrado e a falha só aparece no log.
 
 No desenvolvimento e nos testes, o servidor de e-mail é o **Mailpit**, que sobe no `docker compose`: ele guarda os e-mails em vez de entregar, com a caixa de entrada em [http://localhost:8025](http://localhost:8025). Os testes de integração conferem o aviso pela API dele.
 
-Em produção, configure as variáveis `SMTP_*` com o e-mail do cliente (por exemplo, o Gmail ou o Google Workspace da empresa, com uma senha de app) e o `CONTACT_NOTIFICATION_EMAIL` com o endereço que deve receber os avisos.
+Em produção, configure as variáveis `SMTP_*` com o e-mail do cliente (por exemplo, o Gmail ou o Google Workspace da empresa, com uma senha de app) e o `NOTIFICATION_EMAIL` com o endereço que deve receber os avisos.
 
 ### Proteção contra spam
 
@@ -177,7 +185,7 @@ O formulário de contato e o de orçamento são públicos, então um script pode
 
 - **Limite por IP:** 5 contatos e 10 orçamentos (somando simulador e PDF) por hora para cada IP. Acima disso, a API responde 429. O IP é o do visitante, vindo do `X-Forwarded-For` do proxy do Frontend, como no login. O limite roda antes da validação e do upload, então um script bloqueado nem envia o PDF.
 - **Honeypot no contato:** o site manda um campo `website` escondido, que pessoas não veem. Quando ele chega preenchido, a API responde como sucesso, mas não grava nem avisa. Fica fora do Swagger.
-- **Teto de avisos:** no máximo 20 e-mails de aviso por hora para a empresa. Acima disso, o contato é gravado e aparece na área interna, mas sem e-mail. Vale mesmo contra um ataque espalhado por muitos IPs.
+- **Teto de avisos:** no máximo 20 e-mails de aviso por hora para a empresa, somando contatos e orçamentos. Acima disso, o pedido é gravado e aparece na área interna, mas sem e-mail. Vale mesmo contra um ataque espalhado por muitos IPs.
 
 Se isso não bastar em produção, o próximo passo é um CAPTCHA, como o Cloudflare Turnstile.
 

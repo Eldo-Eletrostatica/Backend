@@ -86,7 +86,7 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_FROM: ${SMTP_FROM:-Site Eldo <site@eldo.local>}
-      CONTACT_NOTIFICATION_EMAIL: ${CONTACT_NOTIFICATION_EMAIL:-contato@eldo.local}
+      NOTIFICATION_EMAIL: ${NOTIFICATION_EMAIL:-contato@eldo.local}
       MAILPIT_API_URL: http://mailpit:8025
     volumes:
       - .:/usr/src/app
