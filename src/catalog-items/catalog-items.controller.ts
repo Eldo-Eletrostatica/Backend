@@ -29,6 +29,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EmployeeRole } from '../employees/entities/employee.entity';
 import { CatalogItemsService } from './catalog-items.service';
+import { CatalogItemOptionResponseDto } from './dto/catalog-item-option-response.dto';
 import { CatalogItemResponseDto } from './dto/catalog-item-response.dto';
 import { CreateCatalogItemDto } from './dto/create-catalog-item.dto';
 import { ListCatalogItemsQueryDto } from './dto/list-catalog-items-query.dto';
@@ -55,6 +56,24 @@ export class CatalogItemsController {
     @Query() query: ListCatalogItemsQueryDto,
   ): Promise<CatalogItemResponseDto[]> {
     return this.catalogItemsService.findAll(query);
+  }
+
+  // Declared before the `:catalogItemId` routes so the UUID pipe does not
+  // capture "options".
+  @Get('options')
+  @Roles(EmployeeRole.Admin, EmployeeRole.Manager, EmployeeRole.Employee)
+  @ApiOperation({
+    summary: 'Lista as opções ativas do catálogo para o lançamento de venda',
+    description:
+      'Retorna os itens ativos com apenas identificador, tipo e nome, sem preços, para preencher o seletor do lançamento de venda. Acessível a qualquer funcionário autenticado, mesmo com o simulador público desligado.',
+  })
+  @ApiOkResponse({
+    description: 'Lista de opções ativas do catálogo',
+    type: [CatalogItemOptionResponseDto],
+  })
+  @ApiUnauthorizedResponse({ description: 'Não autenticado' })
+  findOptions(): Promise<CatalogItemOptionResponseDto[]> {
+    return this.catalogItemsService.findOptions();
   }
 
   @Post()

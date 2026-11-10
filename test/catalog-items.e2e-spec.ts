@@ -8,6 +8,7 @@ import { AppModule } from '../src/app.module';
 import { LoginResponseDto } from '../src/auth/dto/login-response.dto';
 import { hashPassword } from '../src/auth/password-hash';
 import { CatalogItemResponseDto } from '../src/catalog-items/dto/catalog-item-response.dto';
+import { CatalogItemOptionResponseDto } from '../src/catalog-items/dto/catalog-item-option-response.dto';
 import { EmployeeRole } from '../src/employees/entities/employee.entity';
 import { QuoteResponseDto } from '../src/quotes/dto/quote-response.dto';
 import { EstimatorSettingsDto } from '../src/site-settings/dto/estimator-settings.dto';
@@ -35,6 +36,7 @@ describe('Regras de cálculo de orçamento (e2e) - US08', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
   let adminToken: string;
+  let managerToken: string;
   let employeeToken: string;
   let developmentSettings: EstimatorSettingsRow;
 
@@ -56,6 +58,7 @@ describe('Regras de cálculo de orçamento (e2e) - US08', () => {
     dataSource = app.get(DataSource);
 
     adminToken = await loginAs(EmployeeRole.Admin);
+    managerToken = await loginAs(EmployeeRole.Manager);
     employeeToken = await loginAs(EmployeeRole.Employee);
     // site_settings has a single row shared with the development database.
     [developmentSettings] = await dataSource.query<EstimatorSettingsRow[]>(
@@ -385,6 +388,96 @@ describe('Regras de cálculo de orçamento (e2e) - US08', () => {
           : asAdmin().delete(url);
 
       await call.expect(404);
+    });
+  });
+
+  describe('Opções do catálogo para o lançamento de venda', () => {
+    function tokenFor(role: EmployeeRole): string {
+      const tokens = {
+        [EmployeeRole.Admin]: adminToken,
+        [EmployeeRole.Manager]: managerToken,
+        [EmployeeRole.Employee]: employeeToken,
+      };
+      return tokens[role];
+    }
+
+    it.each([EmployeeRole.Admin, EmployeeRole.Manager, EmployeeRole.Employee])(
+      'funcionário autenticado com nível %s consulta as opções ativas, sem preços',
+      async (role) => {
+        const paintBeta = await createCatalogItem({
+          type: 'paintType',
+          pricePerM2: 45.5,
+          name: 'Tinta Beta',
+        });
+        const paintAlfa = await createCatalogItem({
+          type: 'paintType',
+          pricePerM2: 30,
+          name: 'Tinta Alfa',
+        });
+        const material = await createCatalogItem({
+          type: 'partMaterial',
+          priceFactor: 1.2,
+          name: 'Material Alfa',
+        });
+
+        // Resolved before the `:catalogItemId` routes, so it is not rejected.
+        const res = await request(app.getHttpServer())
+          .get('/catalog-items/options')
+          .set('Authorization', `Bearer ${tokenFor(role)}`)
+          .expect(200);
+
+        const options = res.body as CatalogItemOptionResponseDto[];
+        const createdOptions = options.filter((option) =>
+          [
+            paintBeta.catalogItemId,
+            paintAlfa.catalogItemId,
+            material.catalogItemId,
+          ].includes(option.catalogItemId),
+        );
+        // Exact objects: no price fields leak to non-admin callers.
+        expect(createdOptions).toEqual([
+          {
+            catalogItemId: paintAlfa.catalogItemId,
+            type: 'paintType',
+            name: 'Tinta Alfa',
+          },
+          {
+            catalogItemId: paintBeta.catalogItemId,
+            type: 'paintType',
+            name: 'Tinta Beta',
+          },
+          {
+            catalogItemId: material.catalogItemId,
+            type: 'partMaterial',
+            name: 'Material Alfa',
+          },
+        ]);
+      },
+    );
+
+    it('omite os itens inativos das opções do lançamento de venda', async () => {
+      const inactivePaint = await createPaint();
+
+      await asAdmin()
+        .patch(`/catalog-items/${inactivePaint.catalogItemId}`)
+        .send({ isActive: false })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/catalog-items/options')
+        .set('Authorization', `Bearer ${employeeToken}`)
+        .expect(200);
+
+      const options = res.body as CatalogItemOptionResponseDto[];
+      expect(options.map((option) => option.catalogItemId)).not.toContain(
+        inactivePaint.catalogItemId,
+      );
+    });
+
+    it('responde 401 sem login nas opções do catálogo', async () => {
+      await request(app.getHttpServer())
+        .get('/catalog-items/options')
+        .expect(401);
     });
   });
 
