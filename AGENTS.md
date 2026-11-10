@@ -70,7 +70,7 @@ Ao escrever texto em português (documentação, README, issue, PR, commit), sig
 ## Git
 
 - Commits no padrão Conventional Commits, com o tipo em inglês e a descrição em português: `feat: adiciona upload de PDF no orçamento`.
-- Uma branch por tarefa, criada a partir da `main` (`feat/`, `fix/`, `docs/`, `test/`, `chore/`) e integrada por PR.
+- Uma branch por tarefa, criada a partir da `main` e nomeada com as iniciais de quem trabalha nela (`yg/`), integrada por PR.
 - Commit e push acontecem quando a pessoa pede.
 - Commits e PRs levam só a autoria humana, sem linhas de atribuição a agentes.
 
