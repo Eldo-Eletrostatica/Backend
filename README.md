@@ -207,6 +207,22 @@ O IP do visitante vem do último valor do header `X-Forwarded-For`, que o proxy 
 
 Em desenvolvimento, o administrador inicial é `admin@eldo.com.br` com a senha `Admin@123` (variáveis `INITIAL_ADMIN_*`), criado no primeiro login quando ainda não existe nenhum administrador.
 
+### Dados de demonstração
+
+Para o dashboard e os relatórios terem o que mostrar no desenvolvimento, crie os dados de demonstração com a stack de pé:
+
+```bash
+docker compose exec backend npm run seed:demo
+```
+
+| Login | Senha | Nível de acesso |
+| --- | --- | --- |
+| `gestor.demo@eldo.com.br` | `Gestor@2026` | gestor (vê o Dashboard e os Relatórios) |
+
+O comando cria esse gestor, 4 tipos de pintura e 2 materiais da peça, e 15 pedidos espalhados pelo mês atual e pelos cinco anteriores, com orçamentos, vendas e uma venda direta. As datas são calculadas a partir do dia em que o comando roda, então o filtro "Este mês" do dashboard sempre tem dados. Tudo leva "(Demo)" ou "Demo" no nome.
+
+Rodar de novo não duplica nada: se o gestor demo já existe, o comando avisa e para. Ele também se recusa a rodar com `NODE_ENV=production`, para pedidos falsos nunca chegarem ao banco do cliente.
+
 ## Rodando localmente sem Docker (alternativa)
 
 Requer um PostgreSQL rodando à parte, com `.env` apontando `DB_HOST=localhost` para ele.
