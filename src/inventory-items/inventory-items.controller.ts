@@ -25,11 +25,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
-import { InventoryItem } from './entities/inventory-item.entity';
 import {
-  InventoryItemCreated,
-  InventoryItemsService,
-} from './inventory-items.service';
+  InventoryItemCreatedResponseDto,
+  InventoryItemResponseDto,
+} from './dto/inventory-item-response.dto';
+import { InventoryItemsService } from './inventory-items.service';
 
 @ApiTags('inventory-items')
 @ApiBearerAuth()
@@ -41,15 +41,17 @@ export class InventoryItemsController {
 
   @Post()
   @ApiOperation({ summary: 'Cadastra um item de estoque' })
-  @ApiCreatedResponse({ description: 'Item cadastrado' })
-  create(@Body() dto: CreateInventoryItemDto): Promise<InventoryItemCreated> {
+  @ApiCreatedResponse({ type: InventoryItemCreatedResponseDto })
+  create(
+    @Body() dto: CreateInventoryItemDto,
+  ): Promise<InventoryItemCreatedResponseDto> {
     return this.inventoryItemsService.create(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Lista os itens de estoque' })
-  @ApiOkResponse({ type: [InventoryItem] })
-  findAll(): Promise<InventoryItem[]> {
+  @ApiOkResponse({ type: [InventoryItemResponseDto] })
+  findAll(): Promise<InventoryItemResponseDto[]> {
     return this.inventoryItemsService.findAll();
   }
 
@@ -62,17 +64,18 @@ export class InventoryItemsController {
 
   @Get('low-stock')
   @ApiOperation({ summary: 'Lista os itens no estoque mínimo ou abaixo' })
-  @ApiOkResponse({ type: [InventoryItem] })
-  findLowStock(): Promise<InventoryItem[]> {
+  @ApiOkResponse({ type: [InventoryItemResponseDto] })
+  findLowStock(): Promise<InventoryItemResponseDto[]> {
     return this.inventoryItemsService.findLowStock();
   }
 
   @Get(':inventoryItemId')
   @ApiOperation({ summary: 'Consulta um item de estoque' })
+  @ApiOkResponse({ type: InventoryItemResponseDto })
   @ApiNotFoundResponse({ description: 'Item não encontrado' })
   findOne(
     @Param('inventoryItemId', ParseUUIDPipe) inventoryItemId: string,
-  ): Promise<InventoryItem> {
+  ): Promise<InventoryItemResponseDto> {
     return this.inventoryItemsService.findOne(inventoryItemId);
   }
 
@@ -82,7 +85,7 @@ export class InventoryItemsController {
   update(
     @Param('inventoryItemId', ParseUUIDPipe) inventoryItemId: string,
     @Body() dto: UpdateInventoryItemDto,
-  ): Promise<InventoryItem> {
+  ): Promise<InventoryItemResponseDto> {
     return this.inventoryItemsService.update(inventoryItemId, dto);
   }
 

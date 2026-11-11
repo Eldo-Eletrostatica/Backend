@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -12,7 +13,6 @@ import {
 import { TrimString } from '../../common/trim-string';
 import { MAX_STOCK_QUANTITY } from '../../database/columns';
 import {
-  INVENTORY_CATEGORY_MAX_LENGTH,
   INVENTORY_ITEM_NAME_MAX_LENGTH,
   InventoryUnit,
   SUPPLIER_NAME_MAX_LENGTH,
@@ -27,14 +27,10 @@ export class CreateInventoryItemDto {
   name: string;
 
   @ApiProperty({
-    example: 'Tintas',
-    description: 'Texto livre. A categoria não é uma tabela.',
+    description: 'Categoria de estoque, da lista de /inventory-categories',
   })
-  @TrimString()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(INVENTORY_CATEGORY_MAX_LENGTH)
-  category: string;
+  @IsUUID()
+  categoryId: string;
 
   @ApiProperty({
     example: 'Tintas Brasil',

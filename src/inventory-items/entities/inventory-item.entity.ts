@@ -5,11 +5,14 @@ import {
   DeleteDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { stockQuantityColumn } from '../../database/columns';
 import { enumCheck } from '../../database/enum-check';
+import { InventoryCategory } from '../../inventory-categories/entities/inventory-category.entity';
 
 export enum InventoryUnit {
   Kilogram = 'kg',
@@ -18,7 +21,6 @@ export enum InventoryUnit {
 }
 
 export const INVENTORY_ITEM_NAME_MAX_LENGTH = 150;
-export const INVENTORY_CATEGORY_MAX_LENGTH = 100;
 export const SUPPLIER_NAME_MAX_LENGTH = 150;
 
 @Entity('inventory_items')
@@ -34,10 +36,18 @@ export class InventoryItem {
   @Column({ type: 'varchar', length: INVENTORY_ITEM_NAME_MAX_LENGTH })
   name: string;
 
-  // Free text typed by the staff, such as paints or supplies.
-  @Index('IDX_inventory_items_category')
-  @Column({ type: 'varchar', length: INVENTORY_CATEGORY_MAX_LENGTH })
-  category: string;
+  @Index('IDX_inventory_items_category_id')
+  @Column({ type: 'uuid' })
+  categoryId: string;
+
+  // The administrator manages the categories. A removed category stays here,
+  // so the item keeps showing it.
+  @ManyToOne(() => InventoryCategory, { onDelete: 'RESTRICT', nullable: false })
+  @JoinColumn({
+    name: 'category_id',
+    foreignKeyConstraintName: 'FK_inventory_items_category_id',
+  })
+  inventoryCategory: InventoryCategory;
 
   // Only the name: the supplier's contact would depend on the supplier, not
   // on the item, and break the third normal form.
