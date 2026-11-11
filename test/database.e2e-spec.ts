@@ -41,6 +41,7 @@ describe('Schema do banco (e2e)', () => {
     ['catalog_items', 'catalog_item_id'],
     ['orders', 'order_id'],
     ['order_items', 'order_item_id'],
+    ['inventory_categories', 'inventory_category_id'],
     ['inventory_items', 'inventory_item_id'],
     ['stock_movements', 'stock_movement_id'],
     ['showcase_items', 'showcase_item_id'],
