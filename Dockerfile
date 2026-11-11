@@ -1,6 +1,6 @@
-# Production image: docker build --target prod -t eldo-backend .
-# Without --target the build ends at the last stage, "dev", which is what
-# docker-compose.yml uses (hot reload with the source mounted as a volume).
+# The last stage is "prod" because Render builds the last stage of the
+# Dockerfile and accepts no --target. docker-compose.yml picks "dev" by name
+# (hot reload with the source mounted as a volume).
 
 FROM node:22-alpine AS base
 WORKDIR /usr/src/app
@@ -11,6 +11,12 @@ FROM base AS build
 RUN npm ci
 COPY . .
 RUN npm run build
+
+FROM base AS dev
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "start:dev"]
 
 # Only what the API needs to run: no compiler, test tools or sources.
 FROM base AS prod-deps
@@ -27,9 +33,3 @@ COPY --from=build /usr/src/app/dist ./dist
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main"]
-
-FROM base AS dev
-RUN npm install
-COPY . .
-EXPOSE 3000
-CMD ["npm", "run", "start:dev"]
