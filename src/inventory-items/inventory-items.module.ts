@@ -6,7 +6,10 @@ import { InventoryItemsController } from './inventory-items.controller';
 import { InventoryItemsService } from './inventory-items.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([InventoryItem]), InventoryCategoriesModule],
+  imports: [
+    TypeOrmModule.forFeature([InventoryItem]),
+    InventoryCategoriesModule,
+  ],
   controllers: [InventoryItemsController],
   providers: [InventoryItemsService],
   exports: [TypeOrmModule],
