@@ -151,7 +151,7 @@ No código, só o módulo `storage` (`src/storage/`) fala com o bucket. Uma feat
 ## Avaliações do Google
 
 > [!WARNING]
-> **Pendente: ainda não temos a conta do Google Cloud nem a chave da Places API.** A rota `/reviews` nunca foi testada contra o Google de verdade. Até a chave existir, o desenvolvimento usa as avaliações de exemplo (`USE_SAMPLE_REVIEWS=true`), e um servidor sem a chave responde `isAvailable: false`, com um aviso no log ao subir. Antes de publicar o site, é preciso fazer os passos abaixo.
+> **Pendente: falta a chave da Places API.** O código da rota `/reviews` está pronto, mas nunca foi testado contra o Google de verdade, porque ainda não existe a conta do Google Cloud com a chave. Até lá, o desenvolvimento usa as avaliações de exemplo (`USE_SAMPLE_REVIEWS=true`), e um servidor sem a chave responde `isAvailable: false`, com um aviso no log ao subir. Os passos abaixo são o que falta para publicar o site.
 
 A rota `GET /reviews` (US05) busca as avaliações da Eldo na Places API (New) a cada requisição, porque as políticas do Google proíbem guardar esse conteúdo. Para segurar o custo, ela faz no máximo 30 chamadas por dia, o que cabe nas 1.000 grátis do mês.
 
@@ -161,8 +161,11 @@ Para ligar o Google de verdade:
 2. Em **APIs e serviços › Biblioteca**, ative a **Places API (New)**.
 3. Em **APIs e serviços › Credenciais**, crie uma chave de API e restrinja ela à Places API (New).
 4. Em **APIs e serviços › Cotas**, defina uma cota diária para a Places API, como segunda proteção de custo.
-5. Pegue o Place ID da Eldo no [Place ID Finder](https://developers.google.com/maps/documentation/places/web-service/place-id). Ele começa com `ChIJ`.
+5. O Place ID da Eldo (`ChIJc3r5Q0UtWpMRcWGTgj811LI`) já está no `.env.example`. Ele foi derivado do link do Google Maps da empresa, então confirme com o passo 7; se estiver errado, o script mostra o ID que o Google conhece.
 6. No servidor, configure `GOOGLE_PLACES_API_KEY`, `GOOGLE_PLACE_ID` e `USE_SAMPLE_REVIEWS=false`.
+7. Teste o acesso com `npm run google:check` (lê o `.env`). Ele chama a Places API como a rota faz e mostra as avaliações que o site vai exibir, ou o motivo da recusa (cobrança desligada, API não ativada, chave restrita, Place ID errado).
+
+A Places API devolve no máximo 5 avaliações por consulta, as mais relevantes segundo o Google.
 
 ## Avisos por e-mail
 
