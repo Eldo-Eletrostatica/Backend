@@ -2,6 +2,10 @@ import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  isSwaggerEnabled,
+  validateProductionConfig,
+} from './config/production-config';
 
 const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 // Node tries each address of an external host (Cloudflare, Google) for only
@@ -11,6 +15,8 @@ const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 const CONNECTION_ATTEMPT_TIMEOUT_MS = 2000;
 
 async function bootstrap() {
+  // Importing AppModule already loaded the .env into process.env.
+  validateProductionConfig(process.env);
   setDefaultAutoSelectFamilyAttemptTimeout(CONNECTION_ATTEMPT_TIMEOUT_MS);
   const app = await NestFactory.create(AppModule);
 
@@ -23,15 +29,17 @@ async function bootstrap() {
       .filter(Boolean),
   });
 
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Backend API')
-    .setDescription('Documentação da API do backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
+  if (isSwaggerEnabled(process.env)) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Backend API')
+      .setDescription('Documentação da API do backend')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, document);
+  }
 
   await app.listen(process.env.PORT ?? 3000);
 }

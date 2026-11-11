@@ -43,12 +43,13 @@ Variáveis disponíveis (`.env.example`):
 | `GOOGLE_PLACES_API_KEY` | Chave da Places API do Google Cloud, usada pela rota `/reviews`. **Ainda não existe** (ver [Avaliações do Google](#avaliações-do-google)) |
 | `GOOGLE_PLACE_ID` | Place ID da Eldo no Google, a empresa cujas avaliações aparecem no site |
 | `USE_SAMPLE_REVIEWS` | Com `true`, a rota `/reviews` devolve avaliações de exemplo no lugar das do Google. O `docker-compose.yml` liga por padrão, para o desenvolvimento rodar sem chave. Em produção, deixe `false` |
-| `JWT_SECRET` | Segredo HMAC-SHA256 usado para assinar e validar tokens JWT de autenticação dos funcionários |
+| `JWT_SECRET` | Segredo HMAC-SHA256 usado para assinar e validar tokens JWT de autenticação dos funcionários. Em produção, precisa ter pelo menos 32 caracteres e não pode ser o do `.env.example`: gere com `openssl rand -hex 32` |
 | `INITIAL_ADMIN_NAME` | Nome do administrador inicial provisionado no primeiro login quando ainda não há administradores |
 | `INITIAL_ADMIN_EMAIL` | E-mail do administrador inicial provisionado no primeiro login |
 | `INITIAL_ADMIN_PASSWORD` | Senha do administrador inicial provisionado no primeiro login |
 | `CORS_ORIGINS` | Origens liberadas no CORS, separadas por vírgula (padrão `http://localhost:3000`). O site usa o proxy do Frontend e não depende do CORS (ver [Autenticação](#autenticação)) |
-| `NODE_ENV` | Com `production`, os cookies de sessão saem com `Secure`, e o site precisa de HTTPS |
+| `NODE_ENV` | Com `production`, os cookies de sessão saem com `Secure` (o site precisa de HTTPS), o Swagger sai do ar e a API confere a configuração ao subir (ver [Imagem de produção](#imagem-de-produção)) |
+| `ENABLE_SWAGGER` | Com `true`, mantém o Swagger em `/api` mesmo em produção. Fora de produção, ele já fica no ar |
 | `SMTP_HOST`, `SMTP_PORT` | Servidor de e-mail (SMTP). No Docker Compose, o Mailpit (`mailpit:1025`); em produção, o SMTP do e-mail do cliente. Sem `SMTP_HOST`, nenhum e-mail é enviado |
 | `SMTP_USER`, `SMTP_PASSWORD` | Usuário e senha do SMTP. Vazios no Mailpit |
 | `SMTP_FROM` | Remetente dos e-mails, como `Site Eldo <site@dominio.com.br>` |
@@ -70,7 +71,7 @@ Isso sobe três serviços:
 
 Acesse:
 - API: [http://localhost:3001](http://localhost:3001) (retorna `Hello World!`)
-- Documentação Swagger: [http://localhost:3001/api](http://localhost:3001/api)
+- Documentação Swagger: [http://localhost:3001/api](http://localhost:3001/api) (só fora de produção; ver `ENABLE_SWAGGER`)
 
 ### Depois de mudar dependências (`package.json`)
 
@@ -241,6 +242,14 @@ docker run -p 3000:3000 --env-file <arquivo-com-as-variaveis> eldo-backend
 Não há passo separado de migration: a API aplica as migrations pendentes ao subir. O administrador inicial é criado no primeiro login a partir de `INITIAL_ADMIN_*` (ver [Autenticação](#autenticação)), e o `seed:demo` é só para desenvolvimento e não entra na imagem de produção.
 
 Em produção, além das variáveis de banco e do S3 (R2), defina `JWT_SECRET` (um segredo forte, não o de desenvolvimento), `NODE_ENV=production` (a imagem já vem assim), `USE_SAMPLE_REVIEWS=false`, `CORS_ORIGINS`, `SMTP_*`, `NOTIFICATION_EMAIL`, `TURNSTILE_SECRET_KEY` (a chave de produção, par da do site no Frontend) e a senha do administrador inicial. Os cookies de sessão saem com `Secure`, então o site precisa de HTTPS.
+
+Com `NODE_ENV=production`, a API se recusa a subir, listando todos os problemas de uma vez, quando:
+
+- o `JWT_SECRET` é o do `.env.example` ou tem menos de 32 caracteres, porque quem lê o repositório poderia assinar uma sessão;
+- falta o `SMTP_HOST` ou o `NOTIFICATION_EMAIL`, porque os avisos de contato e de orçamento deixariam de sair sem ninguém perceber;
+- o `TURNSTILE_SECRET_KEY` é uma das chaves de teste da Cloudflare, que aprovam (ou recusam) qualquer token.
+
+O Swagger (`/api`) também sai do ar em produção, porque mostra todas as rotas a quem tentar atacar. Para ligá-lo, defina `ENABLE_SWAGGER=true`.
 
 ## Rodando localmente sem Docker (alternativa)
 
