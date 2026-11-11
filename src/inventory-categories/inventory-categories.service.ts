@@ -82,7 +82,9 @@ export class InventoryCategoriesService {
     }
   }
 
-  private toResponse(category: InventoryCategory): InventoryCategoryResponseDto {
+  private toResponse(
+    category: InventoryCategory,
+  ): InventoryCategoryResponseDto {
     return {
       inventoryCategoryId: category.inventoryCategoryId,
       name: category.name,
