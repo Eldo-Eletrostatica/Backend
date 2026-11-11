@@ -23,6 +23,7 @@
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
+    "google:check": "node --env-file=.env scripts/check-google-reviews.mjs",
     "seed:demo": "ts-node src/database/seeds/seed-demo-data.ts"
   },
   "dependencies": {
