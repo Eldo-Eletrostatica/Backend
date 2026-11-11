@@ -232,7 +232,7 @@ Rodar de novo não duplica nada: se o gestor demo já existe, o comando avisa e 
 
 ## Imagem de produção
 
-O `Dockerfile` tem um estágio `prod` com só o necessário para rodar (código compilado e dependências de produção, sem compilador nem testes), que roda como usuário `node`. Sem `--target`, o build vai até o último estágio, `dev`, que é o que o `docker-compose.yml` usa.
+O `Dockerfile` tem um estágio `prod` com só o necessário para rodar (código compilado e dependências de produção, sem compilador nem testes), que roda como usuário `node`. Ele é o último estágio, porque o Render constrói o último estágio do `Dockerfile` e não aceita `--target`; o `docker-compose.yml` escolhe o `dev` pelo nome (`target: dev`).
 
 ```bash
 docker build --target prod -t eldo-backend .
@@ -250,6 +250,51 @@ Com `NODE_ENV=production`, a API se recusa a subir, listando todos os problemas 
 - o `TURNSTILE_SECRET_KEY` é uma das chaves de teste da Cloudflare, que aprovam (ou recusam) qualquer token.
 
 O Swagger (`/api`) também sai do ar em produção, porque mostra todas as rotas a quem tentar atacar. Para ligá-lo, defina `ENABLE_SWAGGER=true`.
+
+## Deploy no Render
+
+O `render.yaml` é um Blueprint do Render: ele cria de uma vez a API (`eldo-api`), o site (`eldo-site`, do repositório do Frontend) e o PostgreSQL (`eldo-db`), todos no plano grátis e na região `virginia`, a mais perto do Brasil. Os custos, a arquitetura de produção e os testes de carga estão na [documentação de deploy](https://eldo-eletrostatica.github.io/Documentacao/deploy/hospedagem-e-custos/).
+
+### Antes de criar o Blueprint
+
+- **Turnstile:** no painel da Cloudflare, em Turnstile, crie um widget no modo Managed com o hostname do site no Render (`eldo-site.onrender.com`, ou o endereço que o Render der ao serviço). Guarde a chave do site e a chave secreta.
+- **E-mail:** a conta que envia os avisos precisa de uma senha de app (Gmail: verificação em duas etapas ligada, depois Segurança, Senhas de app).
+
+### Criando
+
+No painel do Render, em New, Blueprint, escolha este repositório. O Render pede os valores marcados com `sync: false`:
+
+| Variável | Serviço | Valor |
+| --- | --- | --- |
+| `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | eldo-api | Login do primeiro administrador, criado no primeiro acesso |
+| `SMTP_USER`, `SMTP_PASSWORD` | eldo-api | O e-mail que envia os avisos e a senha de app dele |
+| `SMTP_FROM` | eldo-api | `Site Eldo <email-que-envia@gmail.com>` |
+| `NOTIFICATION_EMAIL` | eldo-api | Quem recebe os avisos de contato e orçamento |
+| `TURNSTILE_SECRET_KEY` | eldo-api | Chave secreta do widget do Turnstile |
+| `API_URL` | eldo-site | Endereço público da API: `https://eldo-api.onrender.com`, ou o que o painel mostrar |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | eldo-site | Chave do site do widget do Turnstile |
+
+O banco, o `JWT_SECRET` (gerado pelo Render) e o restante já vêm preenchidos. Se o endereço de um serviço sair diferente do previsto, porque o nome já existia no Render, corrija a `API_URL` do site e o hostname do widget do Turnstile e faça um novo deploy do site: a `API_URL` e a chave do site entram no build.
+
+### O que não funciona no plano grátis
+
+- **Avisos por e-mail:** um web service grátis não envia nas portas do SMTP (25, 465 e 587). Os avisos falham e só aparecem no log.
+- **Upload de imagens e orçamento por PDF:** o armazenamento é provisório até a conta do R2 existir, então esses envios falham.
+- **Avaliações do Google:** sem a chave da Places API (#65), a página inicial mostra avaliações de exemplo (`USE_SAMPLE_REVIEWS=true`).
+- **Sono:** cada serviço dorme depois de 15 minutos sem acesso, e o primeiro acesso seguinte leva cerca de 1 minuto. Antes de uma apresentação, abra a API e o site uns minutos antes.
+- **Banco:** o PostgreSQL grátis expira 30 dias depois de criado, com mais 14 dias para passar a um plano pago antes de os dados serem apagados.
+- **API pública:** private service não tem plano grátis, então a API fica exposta na internet. O limite de envios por IP confia no `X-Forwarded-For` e pode ser burlado chamando a API direto; o CAPTCHA continua protegendo os formulários.
+
+### Passando para produção
+
+Depois que o cartão do cliente estiver cadastrado, um PR troca no `render.yaml`:
+
+1. a API para `type: pserv` (private service) no plano `starter`. O Render cria um serviço novo, porque não converte um web service em private service;
+2. o site para o plano `starter`, com a `API_URL` apontando para o endereço interno da API (`http://<nome>:<porta>`, no painel);
+3. o banco para o plano `basic-256mb`, com `diskSizeGB: 5` e `storageAutoscalingEnabled: true`;
+4. as variáveis `S3_*` e a `STORAGE_PUBLIC_URL` do site para o bucket do R2, e a `USE_SAMPLE_REVIEWS` para `false`, com a `GOOGLE_PLACES_API_KEY`.
+
+No primeiro deploy, confira nos logs se o IP do visitante chega certo: se o `X-Forwarded-For` trouxer o IP do balanceador do Render, todos os visitantes contam como um IP só nos limites de envio e de login.
 
 ## Rodando localmente sem Docker (alternativa)
 
