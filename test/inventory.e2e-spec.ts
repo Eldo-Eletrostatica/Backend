@@ -15,6 +15,7 @@ import { StockMovementResponseDto } from '../src/stock-movements/dto/stock-movem
 type InventoryItemResponse = {
   inventoryItemId: string;
   name: string;
+  categoryId: string;
   category: string;
   supplierName: string;
   unit: string;
@@ -29,6 +30,8 @@ describe('Estoque (e2e)', () => {
   let employeeId: string;
   let authEmployeeId: string;
   let authToken: string;
+  let categoryId: string;
+  let otherCategoryId: string;
 
   const created = {
     inventoryItemIds: [] as string[],
@@ -62,6 +65,9 @@ describe('Estoque (e2e)', () => {
   beforeEach(async () => {
     await dataSource.query('DELETE FROM stock_movements');
     await dataSource.query('DELETE FROM inventory_items');
+    await dataSource.query('DELETE FROM inventory_categories');
+    categoryId = await insertCategory('Tintas');
+    otherCategoryId = await insertCategory('Insumos');
     employeeId = await insertEmployee();
   });
 
@@ -79,6 +85,7 @@ describe('Estoque (e2e)', () => {
       'DELETE FROM employees WHERE employee_id = ANY($1)',
       [created.employeeIds],
     );
+    await dataSource.query('DELETE FROM inventory_categories');
     created.inventoryItemIds.length = 0;
     created.employeeIds.length = 0;
   });
@@ -104,6 +111,15 @@ describe('Estoque (e2e)', () => {
     };
   };
 
+  async function insertCategory(name: string): Promise<string> {
+    const rows = await dataSource.query<{ inventory_category_id: string }[]>(
+      `INSERT INTO inventory_categories (name) VALUES ($1)
+       RETURNING inventory_category_id`,
+      [name],
+    );
+    return rows[0].inventory_category_id;
+  }
+
   async function insertEmployee(): Promise<string> {
     const rows = await dataSource.query<{ employee_id: string }[]>(
       `INSERT INTO employees (name, email, password_hash)
@@ -119,7 +135,7 @@ describe('Estoque (e2e)', () => {
       .post('/inventory-items')
       .send({
         name: 'Tinta preta',
-        category: 'Tintas',
+        categoryId,
         supplierName: 'Fornecedor',
         unit: InventoryUnit.Liter,
         balance: 10,
@@ -171,7 +187,7 @@ describe('Estoque (e2e)', () => {
 
     const updated = await api()
       .patch(`/inventory-items/${createdResponse.inventoryItemId}`)
-      .send({ minimumStock: 4, category: 'Insumos' })
+      .send({ minimumStock: 4, categoryId: otherCategoryId })
       .expect(200);
     expect(updated.body as InventoryItemResponse).toMatchObject({
       minimumStock: 4,
@@ -192,7 +208,6 @@ describe('Estoque (e2e)', () => {
   it('remove espaços das pontas dos textos do item', async () => {
     const item = await createdItem({
       name: '  Tinta preta  ',
-      category: '  Tintas  ',
       supplierName: '  Fornecedor  ',
     });
 
@@ -205,7 +220,7 @@ describe('Estoque (e2e)', () => {
 
   it.each([
     ['nome', { name: null }],
-    ['categoria', { category: null }],
+    ['categoria', { categoryId: null }],
     ['fornecedor', { supplierName: null }],
     ['unidade', { unit: null }],
     ['estoque mínimo', { minimumStock: null }],
@@ -245,7 +260,8 @@ describe('Estoque (e2e)', () => {
   });
 
   it.each([
-    ['sem categoria', { category: '' }],
+    ['sem categoria', { categoryId: '' }],
+    ['com categoria inválida', { categoryId: 'abc' }],
     ['sem fornecedor', { supplierName: '  ' }],
     ['com unidade inválida', { unit: 'metro' }],
     ['com saldo negativo', { balance: -1 }],
