@@ -15,6 +15,7 @@ import { CatalogItemsModule } from './catalog-items/catalog-items.module';
 import { CustomersModule } from './customers/customers.module';
 import { createTypeOrmOptions } from './database/typeorm.config';
 import { EmployeesModule } from './employees/employees.module';
+import { InventoryCategoriesModule } from './inventory-categories/inventory-categories.module';
 import { InventoryItemsModule } from './inventory-items/inventory-items.module';
 import { OrdersModule } from './orders/orders.module';
 import { SalesModule } from './sales/sales.module';
@@ -49,6 +50,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     CustomersModule,
     CatalogItemsModule,
     OrdersModule,
+    InventoryCategoriesModule,
     InventoryItemsModule,
     StockMovementsModule,
     ShowcaseItemsModule,
