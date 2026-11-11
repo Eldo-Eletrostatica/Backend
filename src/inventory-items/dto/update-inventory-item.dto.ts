@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -12,7 +13,6 @@ import { IsOmittable } from '../../common/is-omittable';
 import { TrimString } from '../../common/trim-string';
 import { MAX_STOCK_QUANTITY } from '../../database/columns';
 import {
-  INVENTORY_CATEGORY_MAX_LENGTH,
   INVENTORY_ITEM_NAME_MAX_LENGTH,
   InventoryUnit,
   SUPPLIER_NAME_MAX_LENGTH,
@@ -28,13 +28,12 @@ export class UpdateInventoryItemDto {
   @MaxLength(INVENTORY_ITEM_NAME_MAX_LENGTH)
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    description: 'Categoria de estoque, da lista de /inventory-categories',
+  })
   @IsOmittable()
-  @TrimString()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(INVENTORY_CATEGORY_MAX_LENGTH)
-  category?: string;
+  @IsUUID()
+  categoryId?: string;
 
   @ApiPropertyOptional()
   @IsOmittable()
