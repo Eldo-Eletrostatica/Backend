@@ -226,6 +226,19 @@ O comando cria esse gestor, 4 tipos de pintura e 2 materiais da peça, e 15 pedi
 
 Rodar de novo não duplica nada: se o gestor demo já existe, o comando avisa e para. Ele também se recusa a rodar com `NODE_ENV=production`, para pedidos falsos nunca chegarem ao banco do cliente.
 
+## Imagem de produção
+
+O `Dockerfile` tem um estágio `prod` com só o necessário para rodar (código compilado e dependências de produção, sem compilador nem testes), que roda como usuário `node`. Sem `--target`, o build vai até o último estágio, `dev`, que é o que o `docker-compose.yml` usa.
+
+```bash
+docker build --target prod -t eldo-backend .
+docker run -p 3000:3000 --env-file <arquivo-com-as-variaveis> eldo-backend
+```
+
+Não há passo separado de migration: a API aplica as migrations pendentes ao subir. O administrador inicial é criado no primeiro login a partir de `INITIAL_ADMIN_*` (ver [Autenticação](#autenticação)), e o `seed:demo` é só para desenvolvimento e não entra na imagem de produção.
+
+Em produção, além das variáveis de banco e do S3 (R2), defina `JWT_SECRET` (um segredo forte, não o de desenvolvimento), `NODE_ENV=production` (a imagem já vem assim), `USE_SAMPLE_REVIEWS=false`, `CORS_ORIGINS`, `SMTP_*`, `NOTIFICATION_EMAIL`, `TURNSTILE_SECRET_KEY` (a chave de produção, par da do site no Frontend) e a senha do administrador inicial. Os cookies de sessão saem com `Secure`, então o site precisa de HTTPS.
+
 ## Rodando localmente sem Docker (alternativa)
 
 Requer um PostgreSQL rodando à parte, com `.env` apontando `DB_HOST=localhost` para ele.
