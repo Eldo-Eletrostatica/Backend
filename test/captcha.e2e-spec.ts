@@ -88,3 +88,55 @@ describe('CAPTCHA dos formulários públicos (e2e)', () => {
     },
   );
 });
+
+describe('Token do Selenium no lugar do CAPTCHA (e2e)', () => {
+  const END_TO_END_TOKEN = 'token-do-selenium-com-32-caracteres-ou-mais';
+  let app: INestApplication<App>;
+
+  async function startApp(endToEndToken: string | undefined) {
+    if (endToEndToken === undefined) delete process.env.E2E_CAPTCHA_TOKEN;
+    else process.env.E2E_CAPTCHA_TOKEN = endToEndToken;
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(CaptchaVerifier)
+      .useClass(FakeCaptchaVerifier)
+      .compile();
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  }
+
+  afterEach(async () => {
+    delete process.env.E2E_CAPTCHA_TOKEN;
+    await app.close();
+  });
+
+  function postContactRequest(token: string) {
+    return request(app.getHttpServer())
+      .post('/contact-requests')
+      .set('X-Forwarded-For', randomClientIp())
+      .set('X-Captcha-Token', token)
+      .send({});
+  }
+
+  // As above, the empty body answers 400 once the CAPTCHA passes.
+  it('aceita o token configurado em E2E_CAPTCHA_TOKEN', async () => {
+    await startApp(END_TO_END_TOKEN);
+    await postContactRequest(END_TO_END_TOKEN).expect(400);
+  });
+
+  it('recusa um token diferente do configurado com 403', async () => {
+    await startApp(END_TO_END_TOKEN);
+    await postContactRequest(`${END_TO_END_TOKEN}-errado`).expect(403);
+  });
+
+  it('sem E2E_CAPTCHA_TOKEN, o mesmo token é recusado com 403', async () => {
+    await startApp(undefined);
+    await postContactRequest(END_TO_END_TOKEN).expect(403);
+  });
+
+  it('com E2E_CAPTCHA_TOKEN, o token do Turnstile continua valendo', async () => {
+    await startApp(END_TO_END_TOKEN);
+    await postContactRequest(VALID_CAPTCHA_TOKEN).expect(400);
+  });
+});
