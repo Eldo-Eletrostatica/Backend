@@ -91,6 +91,8 @@ describe('CAPTCHA dos formulários públicos (e2e)', () => {
 
 describe('Token do Selenium no lugar do CAPTCHA (e2e)', () => {
   const END_TO_END_TOKEN = 'token-do-selenium-com-32-caracteres-ou-mais';
+  // docker-compose.yml sets a development token; it comes back at the end.
+  const originalToken = process.env.E2E_CAPTCHA_TOKEN;
   let app: INestApplication<App>;
 
   async function startApp(endToEndToken: string | undefined) {
@@ -107,14 +109,18 @@ describe('Token do Selenium no lugar do CAPTCHA (e2e)', () => {
   }
 
   afterEach(async () => {
-    delete process.env.E2E_CAPTCHA_TOKEN;
     await app.close();
   });
 
-  function postContactRequest(token: string) {
+  afterAll(() => {
+    if (originalToken === undefined) delete process.env.E2E_CAPTCHA_TOKEN;
+    else process.env.E2E_CAPTCHA_TOKEN = originalToken;
+  });
+
+  function postContactRequest(token: string, clientIp = randomClientIp()) {
     return request(app.getHttpServer())
       .post('/contact-requests')
-      .set('X-Forwarded-For', randomClientIp())
+      .set('X-Forwarded-For', clientIp)
       .set('X-Captcha-Token', token)
       .send({});
   }
@@ -138,5 +144,28 @@ describe('Token do Selenium no lugar do CAPTCHA (e2e)', () => {
   it('com E2E_CAPTCHA_TOKEN, o token do Turnstile continua valendo', async () => {
     await startApp(END_TO_END_TOKEN);
     await postContactRequest(VALID_CAPTCHA_TOKEN).expect(400);
+  });
+
+  // The suite sends forms on every run, so its token is not counted by the
+  // per-IP limit; any other token still is.
+  it('o token configurado não conta no limite por IP', async () => {
+    await startApp(END_TO_END_TOKEN);
+    const clientIp = randomClientIp();
+    for (let i = 0; i <= MAX_CONTACT_REQUESTS_PER_HOUR; i++) {
+      await postContactRequest(END_TO_END_TOKEN, clientIp).expect(400);
+    }
+  });
+
+  it('um token errado continua contando no limite por IP', async () => {
+    await startApp(END_TO_END_TOKEN);
+    const clientIp = randomClientIp();
+    for (let i = 0; i < MAX_CONTACT_REQUESTS_PER_HOUR; i++) {
+      await postContactRequest(`${END_TO_END_TOKEN}-errado`, clientIp).expect(
+        403,
+      );
+    }
+    await postContactRequest(`${END_TO_END_TOKEN}-errado`, clientIp).expect(
+      429,
+    );
   });
 });

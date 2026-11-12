@@ -8,8 +8,13 @@ import {
   SetMetadata,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import {
+  readEndToEndToken,
+  sendsEndToEndToken,
+} from '../captcha/end-to-end-token';
 import { findClientIp } from './client-ip';
 import { FixedWindowCounter } from './fixed-window-counter';
 
@@ -36,8 +41,17 @@ interface PublicFormLimit {
 @Injectable()
 export class PublicFormRateLimitGuard implements CanActivate {
   private readonly submissions = new FixedWindowCounter(PUBLIC_FORM_WINDOW_MS);
+  // The Selenium suite sends a few forms on every run; with the secret of
+  // E2E_CAPTCHA_TOKEN it is not counted, so rehearsals and the presentation
+  // do not hit the limit. A wrong token is counted like any other request.
+  private readonly endToEndToken: string | undefined;
 
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    config: ConfigService,
+  ) {
+    this.endToEndToken = readEndToEndToken(config);
+  }
 
   canActivate(context: ExecutionContext): boolean {
     const limit = this.reflector.get<PublicFormLimit | undefined>(
@@ -47,6 +61,7 @@ export class PublicFormRateLimitGuard implements CanActivate {
     if (!limit) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
+    if (sendsEndToEndToken(request, this.endToEndToken)) return true;
     const key = `${limit.form}:${findClientIp(request)}`;
     if (this.submissions.count(key) >= limit.maxPerHour) {
       throw new HttpException(
