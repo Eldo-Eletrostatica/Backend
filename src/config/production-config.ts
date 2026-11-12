@@ -8,6 +8,11 @@ const MIN_JWT_SECRET_LENGTH = 32;
 // token as already used (3x), so none of them protects a real site.
 // https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 const TURNSTILE_TEST_SECRET_KEY = /^[123]x0{31}AA$/;
+// The token lets the Selenium suite skip the CAPTCHA, so it must be as hard to
+// guess as the JWT secret.
+const MIN_E2E_CAPTCHA_TOKEN_LENGTH = 32;
+// The value of .env.example and docker-compose.yml.
+const DEVELOPMENT_E2E_CAPTCHA_TOKEN = 'eldo-dev-e2e-captcha-token-local';
 
 function readText(env: Environment, name: string): string {
   const value = env[name];
@@ -34,6 +39,17 @@ function findProductionProblems(env: Environment): string[] {
   }
   if (TURNSTILE_TEST_SECRET_KEY.test(readText(env, 'TURNSTILE_SECRET_KEY'))) {
     problems.push('TURNSTILE_SECRET_KEY é uma chave de teste da Cloudflare');
+  }
+  const endToEndToken = readText(env, 'E2E_CAPTCHA_TOKEN');
+  if (endToEndToken === DEVELOPMENT_E2E_CAPTCHA_TOKEN) {
+    problems.push('E2E_CAPTCHA_TOKEN é o de desenvolvimento');
+  } else if (
+    endToEndToken &&
+    endToEndToken.length < MIN_E2E_CAPTCHA_TOKEN_LENGTH
+  ) {
+    problems.push(
+      `E2E_CAPTCHA_TOKEN precisa ter pelo menos ${MIN_E2E_CAPTCHA_TOKEN_LENGTH} caracteres`,
+    );
   }
   return problems;
 }
