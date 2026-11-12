@@ -91,6 +91,7 @@ services:
       # Cloudflare's test secret key: every token passes, so the CAPTCHA flow
       # runs end to end in development. Production uses the client's own key.
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
+      E2E_CAPTCHA_TOKEN: ${E2E_CAPTCHA_TOKEN:-eldo-dev-e2e-captcha-token-local}
     volumes:
       - .:/usr/src/app
       - /usr/src/app/node_modules
