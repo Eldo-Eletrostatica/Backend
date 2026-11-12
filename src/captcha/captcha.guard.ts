@@ -6,29 +6,43 @@ import {
   Injectable,
   UseGuards,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import { findClientIp } from '../common/client-ip';
 import { CaptchaVerifier } from './captcha-verifier';
+import {
+  CAPTCHA_HEADER,
+  readEndToEndToken,
+  sendsEndToEndToken,
+} from './end-to-end-token';
 
 export const INVALID_CAPTCHA_MESSAGE =
   'Confirme que você não é um robô e tente de novo.';
-// A header, and not a body field, so the same check fits the JSON and the
-// multipart (PDF) forms without touching their DTOs.
-const CAPTCHA_HEADER = 'x-captcha-token';
 
 // Runs before validation and file upload: a submission without a valid
 // CAPTCHA is refused before any work.
 @Injectable()
 export class CaptchaGuard implements CanActivate {
-  constructor(private readonly captchaVerifier: CaptchaVerifier) {}
+  // The secret the Selenium suite sends in place of the Turnstile token.
+  private readonly endToEndToken: string | undefined;
+
+  constructor(
+    private readonly captchaVerifier: CaptchaVerifier,
+    config: ConfigService,
+  ) {
+    this.endToEndToken = readEndToEndToken(config);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
+    // A header, and not a body field, so the same check fits the JSON and
+    // the multipart (PDF) forms without touching their DTOs.
     const token = request.headers[CAPTCHA_HEADER];
     const isValid =
       typeof token === 'string' &&
       token.length > 0 &&
-      (await this.captchaVerifier.verify(token, findClientIp(request)));
+      (sendsEndToEndToken(request, this.endToEndToken) ||
+        (await this.captchaVerifier.verify(token, findClientIp(request))));
     if (!isValid) {
       throw new ForbiddenException(INVALID_CAPTCHA_MESSAGE);
     }

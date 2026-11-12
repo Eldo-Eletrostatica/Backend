@@ -16,6 +16,13 @@ describe('validateProductionConfig', () => {
   it.each([
     ['produção bem configurada', PRODUCTION_CONFIG],
     [
+      'produção com o token do Selenium',
+      {
+        ...PRODUCTION_CONFIG,
+        E2E_CAPTCHA_TOKEN: '9f4c2a7e1b8d3f6a0c5e2b9d7f1a4c8e',
+      },
+    ],
+    [
       'desenvolvimento com os valores do .env.example',
       {
         NODE_ENV: 'development',
@@ -49,6 +56,16 @@ describe('validateProductionConfig', () => {
       'a chave de teste do Turnstile que recusa tudo',
       { TURNSTILE_SECRET_KEY: '2x0000000000000000000000000000000AA' },
       'TURNSTILE_SECRET_KEY',
+    ],
+    [
+      'o E2E_CAPTCHA_TOKEN de desenvolvimento',
+      { E2E_CAPTCHA_TOKEN: 'eldo-dev-e2e-captcha-token-local' },
+      'E2E_CAPTCHA_TOKEN',
+    ],
+    [
+      'um E2E_CAPTCHA_TOKEN curto',
+      { E2E_CAPTCHA_TOKEN: 'token-curto' },
+      'E2E_CAPTCHA_TOKEN',
     ],
   ])('recusa subir em produção com %s', (_scenario, overrides, variable) => {
     expect(() =>
