@@ -1,21 +1,23 @@
-# Render Blueprint for the demo on the free plan. Every service is free: the
-# API runs as a public web service because private services have no free
-# instance. The move to production (private service, paid plans, R2) is in
-# the "Deploy no Render" section of the README.
+# Render Blueprint for production: the site is the only public service; the
+# API is a private service that only the site reaches, over Render's private
+# network (all three in the same region). Setup steps and the values asked
+# on creation are in the "Deploy no Render" section of the README.
 # Schema: https://render.com/schema/render.yaml.json
 #
 # Values marked "sync: false" are asked once, when the Blueprint is created.
 
 services:
-  - type: web
+  - type: pserv
     name: eldo-api
     runtime: docker
     repo: https://github.com/Eldo-Eletrostatica/Backend
     branch: main
-    plan: free
+    plan: starter
     region: virginia
-    healthCheckPath: /
     envVars:
+      # Fixed so the site's API_HOSTPORT always names the port the API uses.
+      - key: PORT
+        value: '3000'
       - key: DB_HOST
         fromDatabase:
           name: eldo-db
@@ -45,23 +47,21 @@ services:
         sync: false
       - key: INITIAL_ADMIN_PASSWORD
         sync: false
-      # Placeholder storage until the R2 account exists: the API starts, but
-      # image uploads and quotes by PDF fail. Same URL as the Frontend's
-      # STORAGE_PUBLIC_URL.
+      # Cloudflare R2 (ADR 0006). The endpoint is the account's S3 API URL;
+      # the public URL is the bucket's public address (r2.dev or a custom
+      # domain), which already points at the bucket, so it has no bucket path.
       - key: S3_ENDPOINT
-        value: https://armazenamento-provisorio.invalid
+        sync: false
       - key: S3_REGION
         value: auto
       - key: S3_BUCKET
         value: eldo
       - key: S3_ACCESS_KEY_ID
-        value: provisorio
+        sync: false
       - key: S3_SECRET_ACCESS_KEY
-        value: provisorio
+        sync: false
       - key: S3_PUBLIC_URL
-        value: https://armazenamento-provisorio.invalid/eldo
-      # A free web service cannot send on the SMTP ports (25, 465, 587): the
-      # notices fail and only reach the log until the API runs on a paid plan.
+        sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -76,9 +76,10 @@ services:
         sync: false
       - key: TURNSTILE_SECRET_KEY
         sync: false
-      # No Places API key yet (Backend#65): the home page shows sample reviews.
+      # Without GOOGLE_PLACES_API_KEY (Backend#65) the home page says the
+      # reviews are unavailable; adding the key in the dashboard turns them on.
       - key: USE_SAMPLE_REVIEWS
-        value: 'true'
+        value: 'false'
       - key: GOOGLE_PLACE_ID
         value: ChIJc3r5Q0UtWpMRcWGTgj811LI
 
@@ -87,26 +88,34 @@ services:
     runtime: docker
     repo: https://github.com/Eldo-Eletrostatica/Frontend
     branch: main
-    plan: free
+    plan: starter
     region: virginia
-    # A static route: "/" fetches the API, which may still be waking up.
+    # A static route: "/" also depends on the API.
     healthCheckPath: /robots.txt
     # Render passes these to docker build as build args; next build writes
     # them into the output, so changing one needs a new deploy.
     envVars:
-      # Public URL of eldo-api (https://eldo-api.onrender.com, or the one the
-      # dashboard shows). A free web service cannot receive private traffic.
-      - key: API_URL
-        sync: false
+      # The API's private-network host:port, with a suffix Render picks when
+      # it creates the API. The Frontend calls http://<API_HOSTPORT>.
+      - key: API_HOSTPORT
+        fromService:
+          type: pserv
+          name: eldo-api
+          property: hostport
+      # The same public bucket address as the API's S3_PUBLIC_URL.
       - key: STORAGE_PUBLIC_URL
-        value: https://armazenamento-provisorio.invalid/eldo
+        sync: false
       - key: NEXT_PUBLIC_TURNSTILE_SITE_KEY
         sync: false
 
 databases:
   - name: eldo-db
-    plan: free
+    plan: basic-256mb
     region: virginia
     postgresMajorVersion: '16'
     databaseName: eldo
     user: eldo
+    # Data fits in 1 GB; the room is for the WAL and growth, since a full
+    # disk suspends the database. The disk can grow but never shrink.
+    diskSizeGB: 5
+    storageAutoscalingEnabled: true
