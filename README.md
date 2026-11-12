@@ -234,7 +234,7 @@ Rodar de novo não duplica nada: se o gestor demo já existe, o comando avisa e 
 
 ## Imagem de produção
 
-O `Dockerfile` tem um estágio `prod` com só o necessário para rodar (código compilado e dependências de produção, sem compilador nem testes), que roda como usuário `node`. Sem `--target`, o build vai até o último estágio, `dev`, que é o que o `docker-compose.yml` usa.
+O `Dockerfile` tem um estágio `prod` com só o necessário para rodar (código compilado e dependências de produção, sem compilador nem testes), que roda como usuário `node`. Ele é o último estágio, porque o Render constrói o último estágio do `Dockerfile` e não aceita `--target`; o `docker-compose.yml` escolhe o `dev` pelo nome (`target: dev`).
 
 ```bash
 docker build --target prod -t eldo-backend .
@@ -253,6 +253,55 @@ Com `NODE_ENV=production`, a API se recusa a subir, listando todos os problemas 
 - o `E2E_CAPTCHA_TOKEN` é o do `.env.example` ou tem menos de 32 caracteres, porque quem o adivinhar envia os formulários sem CAPTCHA.
 
 O Swagger (`/api`) também sai do ar em produção, porque mostra todas as rotas a quem tentar atacar. Para ligá-lo, defina `ENABLE_SWAGGER=true`.
+
+## Deploy no Render
+
+O `render.yaml` é um Blueprint do Render. Ele cria de uma vez, na região `virginia` (a mais perto do Brasil):
+
+- a API (`eldo-api`), como private service Starter;
+- o site (`eldo-site`, do repositório do Frontend), como web service Starter;
+- o PostgreSQL (`eldo-db`), no plano `basic-256mb`, com 5 GB de disco e aumento automático.
+
+Só o site fica na internet. A API recebe tráfego apenas do site, pela rede privada do Render, que só funciona entre serviços da mesma região. O site acha a API pela `API_HOSTPORT`, preenchida pelo próprio Render quando a API é criada. Os custos, a arquitetura e os testes de carga estão na [documentação de deploy](https://eldo-eletrostatica.github.io/Documentacao/deploy/hospedagem-e-custos/).
+
+### Antes de criar o Blueprint
+
+**Cloudflare R2**, onde ficam as imagens e os PDFs (ADR 0006):
+
+1. Em R2, crie o bucket `eldo`.
+2. Nas configurações do bucket, em Public access, ligue o endereço `r2.dev`. Ele é a `S3_PUBLIC_URL` da API e a `STORAGE_PUBLIC_URL` do site (`https://pub-<id>.r2.dev`, sem barra no fim).
+3. Em Manage API tokens, crie um token com permissão Object Read & Write, só para o bucket `eldo`. Guarde o Access Key ID, o Secret Access Key e o endpoint S3 da conta (`https://<id-da-conta>.r2.cloudflarestorage.com`).
+
+O banco guarda a URL completa de cada arquivo. Se o bucket ganhar um domínio próprio depois, deixe o `r2.dev` ligado, ou as imagens já enviadas deixam de abrir.
+
+**Turnstile:** em Turnstile, crie um widget no modo Managed com o hostname do site (`eldo-site.onrender.com`, ou o endereço que o Render der ao serviço). Guarde a chave do site e a chave secreta.
+
+**E-mail:** a conta que envia os avisos precisa de uma senha de app (no Gmail, ligue a verificação em duas etapas e vá em Segurança, Senhas de app).
+
+### Criando
+
+No painel do Render, em New, Blueprint, escolha este repositório. O Render pede os valores marcados com `sync: false`:
+
+| Variável | Serviço | Valor |
+| --- | --- | --- |
+| `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | eldo-api | Login do primeiro administrador, criado no primeiro acesso |
+| `S3_ENDPOINT` | eldo-api | Endpoint S3 da conta do R2 |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | eldo-api | As chaves do token do R2 |
+| `S3_PUBLIC_URL` | eldo-api | Endereço `r2.dev` do bucket |
+| `SMTP_USER`, `SMTP_PASSWORD` | eldo-api | O e-mail que envia os avisos e a senha de app dele |
+| `SMTP_FROM` | eldo-api | `Site Eldo <email-que-envia@gmail.com>` |
+| `NOTIFICATION_EMAIL` | eldo-api | Quem recebe os avisos de contato e orçamento |
+| `TURNSTILE_SECRET_KEY` | eldo-api | Chave secreta do widget do Turnstile |
+| `STORAGE_PUBLIC_URL` | eldo-site | O mesmo endereço `r2.dev` da `S3_PUBLIC_URL` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | eldo-site | Chave do site do widget do Turnstile |
+
+O banco, a `API_HOSTPORT`, o `JWT_SECRET` (gerado pelo Render) e o restante já vêm preenchidos. A `STORAGE_PUBLIC_URL` e a chave do site entram no build do Frontend: depois de trocar uma delas, faça um novo deploy do site. Se o endereço do site sair diferente de `eldo-site.onrender.com`, porque o nome já existia no Render, corrija o hostname do widget do Turnstile.
+
+### Depois do primeiro deploy
+
+- **IP do visitante:** confira nos logs se o IP do visitante chega certo. Se o `X-Forwarded-For` trouxer o IP do balanceador do Render, todos os visitantes contam como um IP só nos limites de envio e de login.
+- **Avaliações do Google:** sem a `GOOGLE_PLACES_API_KEY` (#65), a página inicial avisa que as avaliações estão indisponíveis. Quando a chave existir, cadastre-a no painel da API e faça um novo deploy.
+- **Suíte Selenium:** para rodar a suíte contra o site no ar, cadastre na API a `E2E_CAPTCHA_TOKEN`, com 32 caracteres ou mais (`openssl rand -hex 32`), e passe o mesmo valor a quem roda a suíte. Sem a variável, o CAPTCHA não tem exceção.
 
 ## Rodando localmente sem Docker (alternativa)
 
