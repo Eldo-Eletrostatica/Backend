@@ -1,0 +1,100 @@
+# Render Blueprint for the staging environment (homologação), where every
+# merge to main is validated before it is promoted to production (the
+# producao branch, render.yaml). It runs on free instances: the services
+# sleep after 15 idle minutes and the API is public, since a free web service
+# cannot use the private network. The database is a Neon project, because a
+# free Render database expires after 30 days. Setup steps are in the
+# "Homologação" section of the README.
+# Schema: https://render.com/schema/render.yaml.json
+#
+# Values marked "sync: false" are asked once, when the Blueprint is created.
+
+services:
+  - type: web
+    name: eldo-api-homolog
+    runtime: docker
+    repo: https://github.com/Eldo-Eletrostatica/Backend
+    branch: main
+    autoDeployTrigger: checksPass
+    plan: free
+    region: virginia
+    healthCheckPath: /
+    envVars:
+      # Neon's direct (not pooled) endpoint: the migrations run on startup.
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: '5432'
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_SSL
+        value: 'true'
+      - key: JWT_SECRET
+        generateValue: true
+      - key: INITIAL_ADMIN_NAME
+        value: Administrador Homologação
+      - key: INITIAL_ADMIN_EMAIL
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      # Its own R2 bucket, so test uploads never mix with the client's files.
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_BUCKET
+        value: eldo-homolog
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_PUBLIC_URL
+        sync: false
+      # A free web service cannot send on the SMTP ports, so the notices only
+      # reach the log. The variables are still required to start in production
+      # mode.
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: '587'
+      - key: SMTP_FROM
+        value: Site Eldo Homologação <homologacao@eldo.invalid>
+      - key: NOTIFICATION_EMAIL
+        value: homologacao@eldo.invalid
+      # The production widget's secret: the staging hostname is added to the
+      # same widget.
+      - key: TURNSTILE_SECRET_KEY
+        sync: false
+      # Lets the Selenium suite skip the CAPTCHA. Only here, never in
+      # production: whoever has it can submit the public forms freely.
+      - key: E2E_CAPTCHA_TOKEN
+        generateValue: true
+      - key: USE_SAMPLE_REVIEWS
+        value: 'true'
+      - key: GOOGLE_PLACE_ID
+        value: ChIJc3r5Q0UtWpMRcWGTgj811LI
+
+  - type: web
+    name: eldo-site-homolog
+    runtime: docker
+    repo: https://github.com/Eldo-Eletrostatica/Frontend
+    branch: main
+    autoDeployTrigger: checksPass
+    plan: free
+    region: virginia
+    healthCheckPath: /robots.txt
+    # Render passes these to docker build as build args; next build writes
+    # them into the output, so changing one needs a new deploy.
+    envVars:
+      # Public URL of eldo-api-homolog (https://eldo-api-homolog.onrender.com,
+      # or the one the dashboard shows).
+      - key: API_URL
+        sync: false
+      - key: STORAGE_PUBLIC_URL
+        sync: false
+      - key: NEXT_PUBLIC_TURNSTILE_SITE_KEY
+        sync: false
