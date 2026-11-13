@@ -14,6 +14,10 @@ export function createTypeOrmOptions(env: DatabaseEnv): DataSourceOptions {
     username: env.DB_USERNAME ?? 'postgres',
     password: env.DB_PASSWORD ?? 'postgres',
     database: env.DB_NAME ?? 'postgres',
+    // Hosted databases outside Render's private network (Neon, in the staging
+    // environment) only accept encrypted connections; their certificates are
+    // public, so Node's bundled CAs verify them.
+    ssl: env.DB_SSL === 'true' ? true : undefined,
     namingStrategy: new SnakeNamingStrategy(),
     // With 'pgcrypto' TypeORM generates UUIDs through gen_random_uuid(), which
     // PostgreSQL 13+ ships built in; the default ('uuid-ossp') needs an extension.
