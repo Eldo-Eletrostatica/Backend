@@ -1,10 +1,12 @@
 name: CI
 
+# producao too: Render deploys production only after this check passes on the
+# commit the promotion pull request creates there.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, producao]
   push:
-    branches: [main]
+    branches: [main, producao]
 
 # A new push to the same PR cancels the run that became outdated.
 concurrency:

@@ -33,6 +33,7 @@ Variáveis disponíveis (`.env.example`):
 | `DB_USERNAME` | Usuário do PostgreSQL |
 | `DB_PASSWORD` | Senha do PostgreSQL |
 | `DB_NAME` | Nome do banco |
+| `DB_SSL` | Com `true`, conecta com SSL. Exigido pelo Neon, que hospeda o banco da homologação; desligado no desenvolvimento e na produção, que fica na rede privada do Render |
 | `PORT` | Porta em que a API sobe (padrão `3000`) |
 | `S3_ENDPOINT` | Endpoint da API S3 (`http://seaweedfs:8333` no Docker Compose; em produção, `https://<account_id>.r2.cloudflarestorage.com`) |
 | `S3_REGION` | Região do S3 (`auto`, que é o valor do R2) |
@@ -256,7 +257,26 @@ O Swagger (`/api`) também sai do ar em produção, porque mostra todas as rotas
 
 ## Deploy no Render
 
-O `render.yaml` é um Blueprint do Render. Ele cria de uma vez, na região `virginia` (a mais perto do Brasil):
+Há dois ambientes, cada um com seu Blueprint:
+
+| Ambiente | Blueprint | Branch publicada | Para quê |
+| --- | --- | --- | --- |
+| Homologação | `render.homolog.yaml` | `main` | Validar cada mudança, rodar a suíte Selenium e testar sem tocar nos dados da Eldo |
+| Produção | `render.yaml` | `producao` | O site que os clientes da Eldo usam |
+
+O caminho de uma mudança:
+
+1. A branch da tarefa entra na `main` por PR, com o CI verde.
+2. O Render publica a `main` na homologação, assim que o CI do commit passa (`autoDeployTrigger: checksPass`).
+3. Alguém do grupo valida na homologação.
+4. Um PR da `main` para a `producao` promove a mudança. Qualquer pessoa do grupo pode aprovar.
+5. O Render publica a `producao` na produção, de novo só depois do CI passar.
+
+Uma correção urgente segue o mesmo caminho. Se algo der errado em produção, o Render volta ao deploy anterior pelo botão Rollback do serviço.
+
+### Produção
+
+O `render.yaml` cria de uma vez, na região `virginia` (a mais perto do Brasil):
 
 - a API (`eldo-api`), como private service Starter;
 - o site (`eldo-site`, do repositório do Frontend), como web service Starter;
@@ -264,7 +284,7 @@ O `render.yaml` é um Blueprint do Render. Ele cria de uma vez, na região `virg
 
 Só o site fica na internet. A API recebe tráfego apenas do site, pela rede privada do Render, que só funciona entre serviços da mesma região. O site acha a API pela `API_HOSTPORT`, preenchida pelo próprio Render quando a API é criada. Os custos, a arquitetura e os testes de carga estão na [documentação de deploy](https://eldo-eletrostatica.github.io/Documentacao/deploy/hospedagem-e-custos/).
 
-### Antes de criar o Blueprint
+#### Antes de criar o Blueprint
 
 **Cloudflare R2**, onde ficam as imagens e os PDFs (ADR 0006):
 
@@ -278,7 +298,7 @@ O banco guarda a URL completa de cada arquivo. Se o bucket ganhar um domínio pr
 
 **E-mail:** a conta que envia os avisos precisa de uma senha de app (no Gmail, ligue a verificação em duas etapas e vá em Segurança, Senhas de app).
 
-### Criando
+#### Criando
 
 No painel do Render, em New, Blueprint, escolha este repositório. O Render pede os valores marcados com `sync: false`:
 
@@ -297,11 +317,38 @@ No painel do Render, em New, Blueprint, escolha este repositório. O Render pede
 
 O banco, a `API_HOSTPORT`, o `JWT_SECRET` (gerado pelo Render) e o restante já vêm preenchidos. A `STORAGE_PUBLIC_URL` e a chave do site entram no build do Frontend: depois de trocar uma delas, faça um novo deploy do site. Se o endereço do site sair diferente de `eldo-site.onrender.com`, porque o nome já existia no Render, corrija o hostname do widget do Turnstile.
 
-### Depois do primeiro deploy
+#### Depois do primeiro deploy
 
 - **IP do visitante:** confira nos logs se o IP do visitante chega certo. Se o `X-Forwarded-For` trouxer o IP do balanceador do Render, todos os visitantes contam como um IP só nos limites de envio e de login.
 - **Avaliações do Google:** sem a `GOOGLE_PLACES_API_KEY` (#65), a página inicial avisa que as avaliações estão indisponíveis. Quando a chave existir, cadastre-a no painel da API e faça um novo deploy.
 - **Suíte Selenium:** para rodar a suíte contra o site no ar, cadastre na API a `E2E_CAPTCHA_TOKEN`, com 32 caracteres ou mais (`openssl rand -hex 32`), e passe o mesmo valor a quem roda a suíte. Sem a variável, o CAPTCHA não tem exceção.
+
+### Homologação
+
+O `render.homolog.yaml` cria a API (`eldo-api-homolog`) e o site (`eldo-site-homolog`) em instâncias grátis do Render: eles dormem depois de 15 minutos sem acesso, e o primeiro acesso seguinte leva cerca de 1 minuto. A API fica pública, porque um web service grátis não usa a rede privada. O banco é um projeto do Neon (`eldo-homolog`, região AWS us-east-1), porque o PostgreSQL grátis do Render expira em 30 dias e o do Neon não.
+
+Antes de criar o Blueprint:
+
+- **Neon:** no projeto `eldo-homolog`, em Connect, copie o host, o usuário, a senha e o banco da conexão **direta** (desligue a opção Connection pooling): as migrations rodam quando a API sobe.
+- **R2:** crie o bucket `eldo-homolog`, ligue o endereço `r2.dev` dele e dê ao token da API acesso também a esse bucket (ou crie um token só para ele).
+- **Turnstile:** acrescente `eldo-site-homolog.onrender.com` aos hostnames do widget da produção.
+
+No painel do Render, em New, Blueprint, escolha este repositório e informe `render.homolog.yaml` como caminho do arquivo. O Render pede:
+
+| Variável | Serviço | Valor |
+| --- | --- | --- |
+| `DB_HOST`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | eldo-api-homolog | A conexão direta do Neon |
+| `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` | eldo-api-homolog | Login do administrador da homologação |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | eldo-api-homolog | O endpoint da conta do R2 e o token com acesso ao `eldo-homolog` |
+| `S3_PUBLIC_URL` | eldo-api-homolog | O endereço `r2.dev` do bucket `eldo-homolog` |
+| `TURNSTILE_SECRET_KEY` | eldo-api-homolog | A mesma chave secreta da produção |
+| `API_URL` | eldo-site-homolog | `https://eldo-api-homolog.onrender.com`, ou o endereço que o painel mostrar |
+| `STORAGE_PUBLIC_URL` | eldo-site-homolog | O mesmo endereço `r2.dev` da `S3_PUBLIC_URL` |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | eldo-site-homolog | A mesma chave do site da produção |
+
+O `JWT_SECRET` e o `E2E_CAPTCHA_TOKEN` são gerados pelo Render. O `E2E_CAPTCHA_TOKEN` libera a suíte Selenium do CAPTCHA e existe **só** na homologação: quem o tiver envia os formulários públicos sem CAPTCHA e sem limite por IP, então ele nunca vai para a produção. Para rodar a suíte, copie o valor do painel da `eldo-api-homolog`.
+
+Os avisos por e-mail não saem da homologação: um web service grátis não envia nas portas do SMTP, e o `NOTIFICATION_EMAIL` aponta para um endereço inválido de propósito, para nenhum teste chegar ao cliente.
 
 ## Rodando localmente sem Docker (alternativa)
 
@@ -337,9 +384,9 @@ docker compose exec postgres psql -U postgres -c '\dt'
 
 ## Integração contínua
 
-Todo PR para a `main` e todo push nela rodam o workflow `.github/workflows/ci.yml` no GitHub Actions: `npm ci`, `lint:check`, `build`, testes unitários e testes de integração contra um Postgres de serviço.
+Todo PR para a `main` ou para a `producao` e todo push nelas rodam o workflow `.github/workflows/ci.yml` no GitHub Actions: `npm ci`, `lint:check`, `build`, testes unitários e testes de integração contra um Postgres de serviço.
 
-A `main` é protegida: só recebe mudanças por PR, e o PR só pode ser mergeado com o check **Lint, build e testes** verde e a branch atualizada com a `main`. A regra vale também para administradores.
+A `main` e a `producao` são protegidas: só recebem mudanças por PR, e o PR só pode ser mergeado com o check **Lint, build e testes** verde e a branch atualizada. A regra vale também para administradores. O Render espera esse mesmo check para publicar (ver [Deploy no Render](#deploy-no-render)).
 
 Os testes de integração rodam também contra o SeaweedFS, que o CI sobe pelo `docker-compose.yml`.
 
