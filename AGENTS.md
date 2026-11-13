@@ -36,6 +36,7 @@ O que cada uma obriga:
 - **0005 (modelo de 9 tabelas):** não crie tabela sem uma ADR que revise esta. Contato, orçamento, venda e OS são etapas de `orders`; tipos de pintura e materiais ficam em `catalog_items`; portfólio e eventos em `showcase_items`; categoria e fornecedor são texto no próprio registro; a comissão é uma regra por funcionário, em `employees`.
 - **0006 (armazenamento):** imagens e PDFs ficam num armazenamento compatível com S3 (SeaweedFS no desenvolvimento, Cloudflare R2 do cliente em produção), e o banco guarda só a URL.
 - **0007 (autenticação por cookie):** no site, a sessão do funcionário fica num cookie `HttpOnly` gravado pelo login, e o Frontend chama a API só pelo proxy `/api` do Next.js. O guard aceita o cookie ou o Bearer; uma escrita autenticada pelo cookie exige o header `X-CSRF-Token` igual ao claim `csrf` do JWT.
+- **0009 (homologação antes da produção):** a `main` é publicada na homologação e a `producao` na produção; a `producao` só recebe a `main` por PR, depois da validação na homologação. A suíte Selenium e o `E2E_CAPTCHA_TOKEN` existem só na homologação.
 
 Ao criar ou alterar uma ADR, atualize esta lista nos três repos.
 
@@ -71,6 +72,7 @@ Ao escrever texto em português (documentação, README, issue, PR, commit), sig
 
 - Commits no padrão Conventional Commits, com o tipo em inglês e a descrição em português: `feat: adiciona upload de PDF no orçamento`.
 - Uma branch por tarefa, criada a partir da `main` e nomeada com as iniciais de quem trabalha nela (`yg/`), integrada por PR.
+- Nunca abra PR de tarefa para a `producao`: ela recebe só o PR de promoção da `main` (ADR 0009).
 - Commit e push acontecem quando a pessoa pede.
 - Commits e PRs levam só a autoria humana, sem linhas de atribuição a agentes.
 
