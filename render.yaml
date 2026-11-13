@@ -2,6 +2,10 @@
 # API is a private service that only the site reaches, over Render's private
 # network (all three in the same region). Setup steps and the values asked
 # on creation are in the "Deploy no Render" section of the README.
+#
+# Production follows the producao branch: a change reaches it only through a
+# pull request from main, after being validated in the staging environment
+# (render.homolog.yaml). checksPass waits for the CI of the commit to succeed.
 # Schema: https://render.com/schema/render.yaml.json
 #
 # Values marked "sync: false" are asked once, when the Blueprint is created.
@@ -11,7 +15,8 @@ services:
     name: eldo-api
     runtime: docker
     repo: https://github.com/Eldo-Eletrostatica/Backend
-    branch: main
+    branch: producao
+    autoDeployTrigger: checksPass
     plan: starter
     region: virginia
     envVars:
@@ -87,7 +92,8 @@ services:
     name: eldo-site
     runtime: docker
     repo: https://github.com/Eldo-Eletrostatica/Frontend
-    branch: main
+    branch: producao
+    autoDeployTrigger: checksPass
     plan: starter
     region: virginia
     # A static route: "/" also depends on the API.
