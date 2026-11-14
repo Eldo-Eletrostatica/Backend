@@ -37,6 +37,8 @@ lerna-debug.log*
 
 # dotenv
 .env
+# Env files kept outside the repos, such as homolog-e2e.env, if copied in
+*.env
 .env.development.local
 .env.test.local
 .env.production.local
