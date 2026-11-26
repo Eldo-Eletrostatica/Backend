@@ -1,0 +1,31 @@
+# Render Blueprint for the public site on the address printed on the course
+# banner (eldo-site.onrender.com). It runs on a free instance, publishes the
+# main branch and talks to the staging API (eldo-api-homolog, created by
+# render.homolog.yaml), so that Blueprint must exist first.
+# Schema: https://render.com/schema/render.yaml.json
+#
+# Values marked "sync: false" are asked once, when the Blueprint is created.
+
+services:
+  - type: web
+    # The onrender.com subdomain comes from this name and is fixed when the
+    # service is created: renaming it later does not change the address.
+    name: eldo-site
+    runtime: docker
+    repo: https://github.com/Eldo-Eletrostatica/Frontend
+    branch: main
+    autoDeployTrigger: checksPass
+    plan: free
+    region: virginia
+    healthCheckPath: /robots.txt
+    # Render passes these to docker build as build args; next build writes
+    # them into the output, so changing one needs a new deploy.
+    envVars:
+      # Public URL of eldo-api-homolog (https://eldo-api-homolog.onrender.com,
+      # or the one the dashboard shows).
+      - key: API_URL
+        sync: false
+      - key: STORAGE_PUBLIC_URL
+        sync: false
+      - key: NEXT_PUBLIC_TURNSTILE_SITE_KEY
+        sync: false
