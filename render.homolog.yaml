@@ -1,6 +1,5 @@
 # Render Blueprint for the staging environment (homologação), where every
-# merge to main is validated before it is promoted to production (the
-# producao branch, render.yaml). It runs on free instances: the services
+# merge to main is validated. It runs on free instances: the services
 # sleep after 15 idle minutes and the API is public, since a free web service
 # cannot use the private network. The database is a Neon project, because a
 # free Render database expires after 30 days. Setup steps are in the
